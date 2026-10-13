@@ -9,7 +9,7 @@
 - Local runtime: Node.js 24.19.0, npm 11.17.0
 - Local engine: XAMPP MariaDB 10.4.32
 - Production/CI target: MySQL 8.4
-- Status: **BLOCKED — implementation and MariaDB acceptance pass; MySQL 8.4 CI result is not yet verified**
+- Status: **PASS**
 
 ## Scope delivered
 
@@ -49,20 +49,20 @@ The migrated local schema contains 28 tables including `schema_migrations`. Seed
 
 ## Acceptance evidence
 
-| Criterion                | Local verdict | Evidence                                                                                                    |
-| ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| Fresh status/apply       | PASS          | Seven pending versions become seven applied versions on empty isolated schema                               |
-| Repeat migration         | PASS          | Second up applies zero; history remains seven rows                                                          |
-| Drift/failure protection | PASS          | Changed checksum is rejected; forced invalid SQL is not recorded                                            |
-| Rollback/re-migrate      | PASS          | One-step and seven-step down pass; zero business tables remain; clean reapply succeeds                      |
-| Constraints/indexes      | PASS          | FK, check, unique email, idempotency, verified-score structure, and ranking index tested                    |
-| Append-only records      | PASS          | XP and admin-audit update/delete attempts fail                                                              |
-| Transaction rollback     | PASS          | Forced DML exception leaves zero inserted user rows                                                         |
-| Deterministic seeds      | PASS          | Consecutive runs return identical counts/content                                                            |
-| Safety guard             | PASS          | Production and ambiguous target names are refused                                                           |
-| M01 regression           | PASS          | Health/configuration/security/database tests remain passing                                                 |
-| MariaDB 10.4             | PASS          | Complete 30-test suite and CLI lifecycle executed locally                                                   |
-| MySQL 8.4                | PENDING       | CI service is configured, but Docker/MySQL is unavailable locally and remote CI status is not yet evidenced |
+| Criterion                | Local verdict | Evidence                                                                                      |
+| ------------------------ | ------------- | --------------------------------------------------------------------------------------------- |
+| Fresh status/apply       | PASS          | Seven pending versions become seven applied versions on empty isolated schema                 |
+| Repeat migration         | PASS          | Second up applies zero; history remains seven rows                                            |
+| Drift/failure protection | PASS          | Changed checksum is rejected; forced invalid SQL is not recorded                              |
+| Rollback/re-migrate      | PASS          | One-step and seven-step down pass; zero business tables remain; clean reapply succeeds        |
+| Constraints/indexes      | PASS          | FK, check, unique email, idempotency, verified-score structure, and ranking index tested      |
+| Append-only records      | PASS          | XP and admin-audit update/delete attempts fail                                                |
+| Transaction rollback     | PASS          | Forced DML exception leaves zero inserted user rows                                           |
+| Deterministic seeds      | PASS          | Consecutive runs return identical counts/content                                              |
+| Safety guard             | PASS          | Production and ambiguous target names are refused                                             |
+| M01 regression           | PASS          | Health/configuration/security/database tests remain passing                                   |
+| MariaDB 10.4             | PASS          | Complete 30-test suite and CLI lifecycle executed locally                                     |
+| MySQL 8.4                | PASS          | GitHub Actions run `38377882160` completed successfully against the `mysql:8.4` service image |
 
 ## Executed checks
 
@@ -80,12 +80,13 @@ Final local verification from the repository root:
 | MariaDB schema inspection            |    0 | 28 tables, seven history rows, expected seed counts                         |
 | Migration CLI status/up/down/up/seed |    0 | 7 applied; repeat 0; rollback 0007; reapply 0007; deterministic seed counts |
 
-MySQL 8.4 CI is not listed as passing because it has not been observed.
+GitHub Actions run [`38377882160`](https://github.com/Omegacarlos1/Gamerush-backend/actions/runs/38377882160) passed `npm ci`, trigger-prerequisite configuration, format, lint, strict typecheck, all 30 tests, build, and high-severity audit on MySQL 8.4.
 
 ### Resolved implementation-time failures
 
 - The inherited format check reported 35 CRLF files although lint/typecheck/tests/build passed. `.gitattributes` now fixes repository text files to LF and the final formatting check passes.
 - The first manual CLI check selected the private `.env` password after PowerShell removed an empty password variable; all five commands failed with access denied before schema changes. The rerun explicitly disabled dotenv for that process, used the XAMPP blank local test password, and completed status/up/down/up/seed successfully. No secret value was printed or changed.
+- The first observable MySQL 8.4 run (`38376834667`) failed while creating append-only triggers because binary logging required trusted trigger creators; later failures were consequences of MySQL's implicit DDL commits. CI now sets `log_bin_trust_function_creators=1` administratively before using the least-privilege migration account, and run `38377882160` passed. The deployment prerequisite is documented in the migration runbook.
 
 ## Security and data-integrity notes
 
@@ -109,10 +110,10 @@ MySQL 8.4 CI is not listed as passing because it has not been observed.
 - Replaced the progression ambiguity with the approved floor/cumulative formula used by the versioned M02 policy.
 - Added durable rules prohibiting edits to applied migrations, restricting rollback/seed targets, acknowledging implicit DDL commits, and preserving append-only XP/audit history.
 
-## Known risks and blockers
+## Known risks
 
-- **Blocking acceptance gap:** MySQL 8.4 execution is not locally available and the remote CI result must be confirmed. MariaDB-only success is insufficient under the PRD.
 - DDL recovery depends on explicit down migrations/backups because neither supported engine provides transaction-wide DDL rollback.
+- Production MySQL environments with binary logging must configure `log_bin_trust_function_creators=1` before applying the append-only trigger migrations with the least-privilege migration account.
 - Data retention, replay archival, and user-deletion/anonymization periods remain launch decisions.
 - The `VALUES(column)` upsert form is portable to MariaDB 10.4 and MySQL 8.4 but deprecated by MySQL; replace it when the project raises its minimum MariaDB version to one supporting the same alias syntax.
 - Pre-existing deletion/addition of the consolidated prompt DOCX/Markdown files remains unrelated and excluded from M02 commits.
@@ -122,9 +123,9 @@ MySQL 8.4 CI is not listed as passing because it has not been observed.
 - [x] M02 implementation scope complete
 - [x] Local MariaDB migration and regression suite pass
 - [x] Documentation, Postman, report, and M03 prompt complete
-- [ ] Confirm the pushed MySQL 8.4 GitHub Actions run passes
+- [x] Pushed MySQL 8.4 GitHub Actions run passes
 
-**Verdict: BLOCKED pending MySQL 8.4 CI evidence.** Do not merge or start M03 until the CI result is green and M02 is explicitly approved.
+**Verdict: PASS.** M02 is ready for review. Do not merge or start M03 until M02 is explicitly approved.
 
 ## Pull request description
 
@@ -134,8 +135,8 @@ Added the normalized Release 1 schema, seven checksum-verified migrations, safe 
 
 ### Validation
 
-Locally: format, lint, strict typecheck, build, audit, Postman parse, CLI lifecycle, and 30 Mocha tests pass on XAMPP MariaDB 10.4.32. MySQL 8.4 CI confirmation remains required.
+Locally: format, lint, strict typecheck, build, audit, Postman parse, CLI lifecycle, and 30 Mocha tests pass on XAMPP MariaDB 10.4.32. GitHub Actions run `38377882160` passes the full quality suite on MySQL 8.4.
 
 ### Risks
 
-DDL is implicitly committed, MySQL CI is pending, retention policy is not finalized, and seed upsert syntax will need modernization when MariaDB compatibility permits.
+DDL is implicitly committed, MySQL trigger deployment has a documented administrative prerequisite, retention policy is not finalized, and seed upsert syntax will need modernization when MariaDB compatibility permits.
