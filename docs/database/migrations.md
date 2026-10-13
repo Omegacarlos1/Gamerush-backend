@@ -29,6 +29,8 @@ npm run db:seed
 
 Always back up persistent data before rollback. MySQL and MariaDB implicitly commit DDL, so a multi-statement schema migration cannot be transactionally undone as a unit. If a DDL statement fails, the migration is not recorded; inspect the database and use its down section or restore procedure before retrying. DML services and seeds use explicit transactions.
 
+The migration account needs normal DDL privileges plus `TRIGGER`. When MySQL binary logging is enabled, an administrator must also set `log_bin_trust_function_creators=1` before applying migrations with the least-privilege migration account. This permits the append-only XP/audit triggers without granting that account `SUPER`; the CI MySQL service configures the setting explicitly. This is an infrastructure prerequisite, not an application runtime privilege.
+
 ## Local XAMPP verification
 
 The automated lifecycle suite defaults to `playrush_migrations_test`. It may roll back every known M02 table and must never point at development, staging, or production data. Configure a dedicated test account through:
