@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+coverage/
+dist/
+dist-test/
+.DS_Store
+*.log
+.eslintcache
+.nyc_output/
+.npm-cache/
