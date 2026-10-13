@@ -18,7 +18,11 @@
     "format:check": "prettier --check .",
     "build:test": "tsc -p tsconfig.test.json",
     "test": "npm run build:test && mocha \"dist-test/test/**/*.test.js\"",
-    "test:db": "npm run build:test && mocha \"dist-test/test/database/**/*.test.js\""
+    "test:db": "npm run build:test && mocha \"dist-test/test/database/**/*.test.js\"",
+    "db:migrate:status": "tsx src/cli/database.ts status",
+    "db:migrate:up": "tsx src/cli/database.ts up",
+    "db:migrate:down": "tsx src/cli/database.ts down",
+    "db:seed": "tsx src/cli/database.ts seed"
   },
   "dependencies": {
     "cors": "2.8.6",
