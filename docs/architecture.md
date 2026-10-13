@@ -32,3 +32,11 @@ Production remains MySQL. CI starts MySQL 8.4 so future migrations can be checke
 ## Operational behavior
 
 Environment variables are parsed before infrastructure is created. Production rejects wildcard CORS, blank database passwords, and a root database account. Failed startup connectivity logs a safe degraded event; the server remains available for controlled health responses. SIGINT and SIGTERM close the HTTP server and pool.
+
+## M02 persistence architecture
+
+Versioned SQL lives outside application modules in `database/migrations`. The infrastructure migration loader parses explicit up/down sections and checksums normalized contents. The runner serializes changes with a database advisory lock and owns the `schema_migrations` history table. Applied-file drift is a hard failure.
+
+Destructive commands receive the validated environment and database name and refuse production or ambiguous targets. Seeds and future multi-write use cases use the shared `withTransaction` helper. Schema DDL is not described as transaction-atomic because both supported engines implicitly commit it; recovery uses unrecorded-failure detection, explicit down SQL, backups, and restore procedures.
+
+The schema is organized around identity, immutable game/rules versions, gameplay evidence versus verified results, append-only progression, weekly competition snapshots, idempotent virtual rewards, and auditable administration. See `docs/database/data-model.md` for relationships and retention boundaries.

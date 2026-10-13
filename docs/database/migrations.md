@@ -1,0 +1,46 @@
+# Migration and seed operations
+
+## Files and history
+
+Migration definitions live in `database/migrations` and use ordered filenames plus explicit sections:
+
+```sql
+-- migrate:up
+-- forward SQL
+
+-- migrate:down
+-- reverse SQL
+```
+
+The runner normalizes line endings, calculates SHA-256 checksums, acquires the `playrush_schema_migrations` advisory lock, and records a version only after all its forward statements finish. It refuses changed or missing applied definitions.
+
+## Commands
+
+Use the database selected by `.env`:
+
+```powershell
+npm run db:migrate:status
+npm run db:migrate:up
+npm run db:migrate:down -- --steps=1
+npm run db:seed
+```
+
+`up` is valid for controlled deployment environments. `down` and `seed` are deliberately stricter: they refuse `NODE_ENV=production` and require a database name visibly containing `dev`, `development`, or `test` as its own underscore-delimited segment.
+
+Always back up persistent data before rollback. MySQL and MariaDB implicitly commit DDL, so a multi-statement schema migration cannot be transactionally undone as a unit. If a DDL statement fails, the migration is not recorded; inspect the database and use its down section or restore procedure before retrying. DML services and seeds use explicit transactions.
+
+## Local XAMPP verification
+
+The automated lifecycle suite defaults to `playrush_migrations_test`. It may roll back every known M02 table and must never point at development, staging, or production data. Configure a dedicated test account through:
+
+- `TEST_DB_HOST`
+- `TEST_DB_PORT`
+- `TEST_DB_USER`
+- `TEST_DB_PASSWORD`
+- `TEST_DB_NAME`
+
+After a successful suite, the test schema is left fully migrated and seeded for inspection in phpMyAdmin.
+
+## Seed contents
+
+Seeds are deterministic and repeat-safe. They contain two roles, one endless-runner game/version, three cosmetic characters, one progression policy, two achievement definitions, three weekly placement badges, and four top-10 virtual reward rules. They contain no usable accounts, passwords, sessions, or tokens.
