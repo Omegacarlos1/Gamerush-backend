@@ -14,7 +14,7 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_DATABASE: playrush_test
+          MYSQL_DATABASE: playrush_migrations_test
           MYSQL_USER: playrush_test
           MYSQL_PASSWORD: ci-test-password
           MYSQL_ROOT_PASSWORD: ci-root-password
@@ -31,18 +31,41 @@ jobs:
       TEST_DB_PORT: 3306
       TEST_DB_USER: playrush_test
       TEST_DB_PASSWORD: ci-test-password
-      TEST_DB_NAME: playrush_test
+      TEST_DB_NAME: playrush_migrations_test
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Configure MySQL trigger creation
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+        run: >-
+          docker exec -e MYSQL_PWD=ci-root-password "$MYSQL_CONTAINER_ID"
+          mysql -uroot -e "SET GLOBAL log_bin_trust_function_creators = 1"
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - name: Run npm test
+        id: test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+      - name: Publish test failure details
+        if: failure() && steps.test.outcome == 'failure'
+        shell: bash
+        run: |
+          {
+            echo '### MySQL 8.4 test failure'
+            echo '```text'
+            tail -n 120 test-output.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          message="$(tail -n 60 test-output.log | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
+          echo "::error title=MySQL 8.4 test failure::$message"
       - run: npm run build
       - run: npm audit --audit-level=high

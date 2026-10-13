@@ -15,7 +15,7 @@ Use a modular monolith. Separate routes/controllers, application services, repos
 ## Product invariants
 
 - Score: 1 point per metre, 10 points per coin, subject to trustworthy validation.
-- XP: 1 XP per 10 validated score points; 500 XP per level; clarify rounding/thresholds before M04.
+- XP: floor of validated score divided by 10; Level = 1 + floor(total XP / 500), as approved from the PRD for the versioned M02 progression policy.
 - Cosmetic characters unlock at levels 3 and 5; no competitive advantage.
 - Weekly leaderboard: Monday 00:00 UTC reset; highest validated weekly score; earliest completion breaks ties.
 - Top 10: virtual XP/badge rewards, granted idempotently.
@@ -100,3 +100,10 @@ Before performing Git operations, inspect the current branch, working tree and r
 - All API errors use the standardized JSON error envelope and include the response request ID.
 - Automated database tests must use an explicitly test-scoped database and must never target development, staging or production data.
 - Local MariaDB success does not replace production MySQL compatibility testing.
+
+## Database migration conventions
+
+- Never edit an applied migration; add a new ordered migration. The runner rejects checksum drift.
+- Migration rollback and seed commands must refuse production and databases not explicitly named for development/test.
+- MySQL/MariaDB DDL is implicitly committed; document recovery through down migrations and backups instead of claiming transaction-wide DDL rollback.
+- Keep XP ledger and administrator audit history append-only. Corrections are new traceable records.

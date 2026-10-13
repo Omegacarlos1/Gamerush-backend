@@ -1,0 +1,63 @@
+{
+  "info": {
+    "_postman_id": "ef878b04-e326-4350-867f-5839fa41d002",
+    "name": "PlayRush M02 Data Model",
+    "description": "M02 API smoke checks after database migration. Migration operations are CLI-based.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health after migration",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/health",
+        "description": "Authentication: none. Requires the configured schema to be reachable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.status).to.eql('ok');",
+              "pm.expect(body.checks.database).to.eql('up');",
+              "pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string');",
+              "pm.expect(pm.response.text()).not.to.include('password');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unknown route",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/not-found",
+        "description": "Authentication: none. Standardized negative route case."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('status is 404', () => pm.response.to.have.status(404));",
+              "const body = pm.response.json();",
+              "pm.expect(body.error.code).to.eql('ROUTE_NOT_FOUND');",
+              "pm.expect(body.error.requestId).to.eql(pm.response.headers.get('X-Request-Id'));",
+              "pm.expect(body.error).not.to.have.property('stack');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
