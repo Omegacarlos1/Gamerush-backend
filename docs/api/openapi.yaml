@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: PlayRush Backend API
+  version: 0.1.0
+  description: M01 foundation API. Business APIs are not yet implemented.
+servers:
+  - url: http://127.0.0.1:3000/api/v1
+    description: Local XAMPP MariaDB development
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check HTTP and database availability
+      security: []
+      responses:
+        '200':
+          description: Application and database are available
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                timestamp: '2026-10-13T08:00:00.000Z'
+                checks:
+                  database: up
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Database connectivity check failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: Service temporarily unavailable
+                  requestId: d9428888-122b-4c26-879b-1234567890ab
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, timestamp, checks]
+      properties:
+        status:
+          const: ok
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          additionalProperties: false
+          required: [database]
+          properties:
+            database:
+              const: up
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            requestId:
+              type: string
+  responses:
+    RateLimited:
+      description: Request rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
