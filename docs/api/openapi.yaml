@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: PlayRush Backend API
-  version: 0.1.0
-  description: M01 foundation API. Business APIs are not yet implemented.
+  version: 0.3.0
+  description: M03 foundation and identity/access API. Authentication tokens use cookies and are never returned in JSON.
 servers:
   - url: http://127.0.0.1:3000/api/v1
     description: Local XAMPP MariaDB development
@@ -17,33 +17,322 @@ paths:
           description: Application and database are available
           headers:
             X-Request-Id:
-              schema:
-                type: string
-                format: uuid
+              $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-              example:
-                status: ok
-                timestamp: '2026-10-13T08:00:00.000Z'
-                checks:
-                  database: up
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: Database connectivity check failed
+          $ref: '#/components/responses/ServiceUnavailable'
+  /auth/register:
+    post:
+      operationId: registerAccount
+      summary: Register a pending player account
+      description: Normalizes identity values, stores an Argon2id password hash, and requests verification delivery.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Pending account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '409':
+          description: Email or username is already registered; the conflicting field is not disclosed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: SERVICE_UNAVAILABLE
-                  message: Service temporarily unavailable
-                  requestId: d9428888-122b-4c26-879b-1234567890ab
+        '429':
+          $ref: '#/components/responses/AuthRateLimited'
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      summary: Consume a single-use email-verification token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{43}$'
+      responses:
+        '204':
+          description: Email verified and account activated
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Token is unknown, expired, or already consumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/AuthRateLimited'
+  /auth/login:
+    post:
+      operationId: login
+      summary: Authenticate an active verified account
+      description: Sets access, rotating refresh, and signed CSRF cookies. Invalid email and password share one response.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated; cookies are set on the response
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Email or password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Verification is required or the account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/AuthRateLimited'
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: Rotate a refresh token and issue a new cookie set
+      description: Requires a refresh cookie and matching signed session-bound CSRF cookie/header. Reuse revokes the token family.
+      security:
+        - refreshCookie: []
+          csrfHeader: []
+      responses:
+        '200':
+          description: Session rotated and replacement cookies set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Session is invalid, expired, or replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: CSRF validation failed or account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke the current refresh session and clear authentication cookies
+      description: Idempotent. A supplied refresh cookie requires its matching CSRF header and cookie.
+      security:
+        - refreshCookie: []
+          csrfHeader: []
+      responses:
+        '204':
+          description: Session revoked or already absent; cookies cleared
+        '403':
+          description: CSRF validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Return the currently authenticated user
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Current account and session are valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Access token or backing session is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/admin-check:
+    get:
+      operationId: checkAdminAuthorization
+      summary: Minimal M03 authorization probe
+      description: Proves server-side admin-role enforcement; this is not an administration module.
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Authenticated account currently has the admin role
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [authorized]
+                    properties:
+                      authorized:
+                        const: true
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin role is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-playrush_access
+      description: Production name. Non-Secure local HTTP uses playrush_access.
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-playrush_refresh
+      description: Production name. Non-Secure local HTTP uses playrush_refresh.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  headers:
+    RequestId:
+      schema:
+        type: string
+        format: uuid
   schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        username:
+          type: string
+          pattern: '^[a-zA-Z0-9_]{3,30}$'
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+          description: Must contain uppercase, lowercase, and numeric characters.
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, email, username, role, status, emailVerified]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+        status:
+          type: string
+          enum: [pending_verification, active, suspended, deleted]
+        emailVerified:
+          type: boolean
+        sessionId:
+          type: string
+          format: uuid
+    UserResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [user, accessTokenExpiresAt]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessTokenExpiresAt:
+              type: string
+              format: date-time
     HealthResponse:
       type: object
       additionalProperties: false
@@ -77,9 +366,28 @@ components:
               type: string
             requestId:
               type: string
+              format: uuid
   responses:
+    InvalidRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     RateLimited:
-      description: Request rate limit exceeded
+      description: Global request rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AuthRateLimited:
+      description: Authentication attempt rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: Database connectivity check failed
       content:
         application/json:
           schema:

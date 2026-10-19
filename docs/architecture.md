@@ -40,3 +40,9 @@ Versioned SQL lives outside application modules in `database/migrations`. The in
 Destructive commands receive the validated environment and database name and refuse production or ambiguous targets. Seeds and future multi-write use cases use the shared `withTransaction` helper. Schema DDL is not described as transaction-atomic because both supported engines implicitly commit it; recovery uses unrecorded-failure detection, explicit down SQL, backups, and restore procedures.
 
 The schema is organized around identity, immutable game/rules versions, gameplay evidence versus verified results, append-only progression, weekly competition snapshots, idempotent virtual rewards, and auditable administration. See `docs/database/data-model.md` for relationships and retention boundaries.
+
+## M03 identity architecture
+
+The identity module follows domain/application/infrastructure/presentation boundaries. `AuthService` owns account and session rules through injected repository, password-hashing, token-delivery, clock, and logging dependencies. `MySqlAuthRepository` implements parameterized queries and exposes explicit transaction-scoped operations; controllers only validate HTTP input, manage cookies, and map service results.
+
+Registration and verification reuse the M02 identity tables without editing applied migrations. Authentication uses Argon2id password hashes, signed short-lived access JWTs, hashed rotating refresh tokens, live session/account checks, and signed session-bound CSRF tokens. Refresh row locks make replacement/replay outcomes deterministic under concurrency. See `docs/security/authentication.md` for the transport and account-state policy.

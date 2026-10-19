@@ -107,3 +107,10 @@ Before performing Git operations, inspect the current branch, working tree and r
 - Migration rollback and seed commands must refuse production and databases not explicitly named for development/test.
 - MySQL/MariaDB DDL is implicitly committed; document recovery through down migrations and backups instead of claiming transaction-wide DDL rollback.
 - Keep XP ledger and administrator audit history append-only. Corrections are new traceable records.
+
+## Authentication conventions
+
+- Passwords use documented Argon2id parameters; plaintext credentials and bearer/verification tokens never enter persistence, responses, or logs.
+- Browser authentication uses host-only HttpOnly access/refresh cookies, Secure `__Host-` names in production, and signed session-bound CSRF protection for cookie-authenticated mutations.
+- Refresh tokens rotate transactionally. Reuse revokes the complete token family and must remain safe under concurrent requests.
+- Authorization checks live account/session/role state; a valid JWT alone is not sufficient.

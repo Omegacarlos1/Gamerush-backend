@@ -24,7 +24,7 @@ GRANT ALL PRIVILEGES ON playrush_migrations_test.* TO 'playrush_test'@'localhost
 FLUSH PRIVILEGES;
 ```
 
-3. Copy `.env.example` to `.env`, then set the local database username and password. `.env` is ignored by Git.
+3. Copy `.env.example` to `.env`, set the local database username/password, and generate independent `AUTH_ACCESS_TOKEN_SECRET` and `AUTH_CSRF_SECRET` values of at least 32 characters. Local HTTP may keep `AUTH_COOKIE_SECURE=false`; production validation requires it to be `true`. `.env` is ignored by Git.
 4. Install and run:
 
 ```powershell
@@ -59,6 +59,15 @@ The integration suite defaults to `playrush_migrations_test`, `root`, and a blan
 ## API
 
 - `GET /api/v1/health` — database-backed liveness/readiness response
+- `POST /api/v1/auth/register` — create a pending player account
+- `POST /api/v1/auth/verify-email` — consume a single-use verification token
+- `POST /api/v1/auth/login` — set access, rotating refresh, and signed CSRF cookies
+- `POST /api/v1/auth/refresh` — rotate the cookie session with `X-CSRF-Token`
+- `POST /api/v1/auth/logout` — revoke the session and clear cookies
+- `GET /api/v1/auth/me` — return the current verified active account
+- `GET /api/v1/auth/admin-check` — M03-only role-enforcement probe
 - Any unknown route — standardized `404` JSON error
 
-See [architecture](docs/architecture.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M02 examples](docs/postman/M02-examples.md).
+Authentication cookies are host-only and `SameSite=Strict`; production requires Secure `__Host-` names. Refresh and cookie-backed logout require the readable CSRF cookie value in `X-CSRF-Token`. No email vendor is configured; tests inject a deterministic verification-delivery adapter.
+
+See [architecture](docs/architecture.md), [authentication security](docs/security/authentication.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M03 examples](docs/postman/M03-examples.md).
