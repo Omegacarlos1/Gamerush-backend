@@ -17,6 +17,27 @@ const environmentSchema = z
     CORS_ORIGINS: z.string().trim().min(1).default('http://localhost:5173'),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
+    AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+    AUTH_ACCESS_TOKEN_SECRET: z.string().min(32),
+    AUTH_CSRF_SECRET: z.string().min(32),
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3_600).default(900),
+    AUTH_REFRESH_TOKEN_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(3_600)
+      .max(7_776_000)
+      .default(2_592_000),
+    AUTH_VERIFICATION_TOKEN_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(300)
+      .max(604_800)
+      .default(86_400),
+    AUTH_COOKIE_SECURE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
     DB_HOST: z.string().trim().min(1).default('127.0.0.1'),
     DB_PORT: z.coerce.number().int().min(1).max(65_535).default(3306),
     DB_USER: z.string().trim().min(1),
@@ -54,6 +75,14 @@ const environmentSchema = z
         message: 'must use a least-privilege account in production',
       });
     }
+
+    if (environment.NODE_ENV === 'production' && !environment.AUTH_COOKIE_SECURE) {
+      context.addIssue({
+        code: 'custom',
+        path: ['AUTH_COOKIE_SECURE'],
+        message: 'must be true in production',
+      });
+    }
   });
 
 export interface AppConfig {
@@ -66,6 +95,18 @@ export interface AppConfig {
   readonly rateLimit: {
     readonly windowMs: number;
     readonly max: number;
+  };
+  readonly auth: {
+    readonly accessTokenSecret: string;
+    readonly csrfSecret: string;
+    readonly accessTokenTtlSeconds: number;
+    readonly refreshTokenTtlSeconds: number;
+    readonly verificationTokenTtlSeconds: number;
+    readonly cookieSecure: boolean;
+    readonly rateLimit: {
+      readonly windowMs: number;
+      readonly max: number;
+    };
   };
   readonly database: {
     readonly host: string;
@@ -113,6 +154,18 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): AppConfig {
     rateLimit: {
       windowMs: result.data.RATE_LIMIT_WINDOW_MS,
       max: result.data.RATE_LIMIT_MAX,
+    },
+    auth: {
+      accessTokenSecret: result.data.AUTH_ACCESS_TOKEN_SECRET,
+      csrfSecret: result.data.AUTH_CSRF_SECRET,
+      accessTokenTtlSeconds: result.data.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      refreshTokenTtlSeconds: result.data.AUTH_REFRESH_TOKEN_TTL_SECONDS,
+      verificationTokenTtlSeconds: result.data.AUTH_VERIFICATION_TOKEN_TTL_SECONDS,
+      cookieSecure: result.data.AUTH_COOKIE_SECURE,
+      rateLimit: {
+        windowMs: result.data.AUTH_RATE_LIMIT_WINDOW_MS,
+        max: result.data.AUTH_RATE_LIMIT_MAX,
+      },
     },
     database: {
       host: result.data.DB_HOST,

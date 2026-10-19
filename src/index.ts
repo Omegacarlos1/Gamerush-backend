@@ -6,6 +6,10 @@ export { loadMigrations } from './infrastructure/database/migrations/migration-l
 export { MigrationRunner } from './infrastructure/database/migrations/migration-runner.js';
 export { seedCatalog } from './infrastructure/database/seeds/catalog-seed.js';
 export { withTransaction } from './infrastructure/database/transaction.js';
+export { AuthService } from './modules/auth/application/auth.service.js';
+export { Argon2PasswordHasher } from './modules/auth/infrastructure/argon2-password-hasher.js';
+export { MySqlAuthRepository } from './modules/auth/infrastructure/mysql-auth.repository.js';
+export { UnconfiguredVerificationDelivery } from './modules/auth/infrastructure/verification-delivery.js';
 export {
   HealthService,
   type DatabaseHealthCheck,

@@ -23,3 +23,31 @@ export class CorsOriginError extends AppError {
     this.name = 'CorsOriginError';
   }
 }
+
+export class InvalidRequestError extends AppError {
+  public constructor(message = 'Request validation failed') {
+    super(400, 'INVALID_REQUEST', message);
+    this.name = 'InvalidRequestError';
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  public constructor(code = 'AUTHENTICATION_REQUIRED', message = 'Authentication required') {
+    super(401, code, message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  public constructor(code = 'ACCESS_DENIED', message = 'Access denied') {
+    super(403, code, message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export class ConflictError extends AppError {
+  public constructor(code: string, message: string) {
+    super(409, code, message);
+    this.name = 'ConflictError';
+  }
+}
