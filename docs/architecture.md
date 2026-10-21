@@ -54,3 +54,11 @@ The player module adds domain, application, MySQL repository, and Express presen
 The application loads the active versioned progression policy through an injected policy service. Profile creation uses an idempotent insert followed by a locking/current read. Awards lock the profile row, recheck the global idempotency key after serialization, append the ledger event, and update cached total/level in one transaction with bounded deadlock retry. The original policy version and resulting level are stored in ledger metadata so idempotent replay returns the original effect.
 
 History uses a versioned opaque cursor over the existing `(user_id, created_at, id)` ordering and remains scoped to the authenticated player. Database IDs and internal ledger metadata do not cross the HTTP boundary. M04 uses the existing seven migrations unchanged; see `docs/progression.md` for policy, privacy, and failure behavior.
+
+## M05 game catalog and session architecture
+
+The games module follows the same domain/application/infrastructure/presentation boundaries. Public catalog queries join only active games to their selected published active version; active cosmetic characters are returned as display configuration. Public responses are short-cacheable, while session creation always reads the current database selection inside its transaction.
+
+Authenticated session creation reuses M03 live account authorization and signed CSRF. The application generates a public UUID plus independent random seed/nonce values, persists only SHA-256 hashes, fixes server UTC start/expiry from the immutable version duration, and transitions the new row from issued to active in one transaction. A locked active-user row serializes the one-open-session-per-player/game/mode rule across concurrent requests. Expired open sessions are marked before a replacement is considered.
+
+Owner-scoped retrieval locks the session long enough to apply boundary expiry and then maps an allowlisted response without credentials, hashes, database IDs, or another player's state. Internal lifecycle rules and transaction-scoped session/score-verification ports prepare M06, but there is no evidence/score route or gameplay progression effect in M05. See `docs/game-sessions.md` for the browser contract and state diagram.

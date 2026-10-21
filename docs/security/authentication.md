@@ -24,7 +24,7 @@ Refresh locks the presented session row, verifies the token hash in constant tim
 
 ## CSRF policy
 
-Refresh, cookie-backed logout, and authenticated profile PATCH require the CSRF cookie value in `X-CSRF-Token`. The value contains a random nonce and HMAC bound to the refresh-session UUID. The server verifies cookie/header equality and the HMAC without logging token values. `SameSite=Strict`, host-only cookies, and controlled credentialed CORS provide additional layers. Future cookie-authenticated mutation routes must reuse the same protection unless a stronger approved mechanism replaces it.
+Refresh, cookie-backed logout, authenticated profile PATCH, and game-session creation require the CSRF cookie value in `X-CSRF-Token`. The value contains a random nonce and HMAC bound to the refresh-session UUID. The server verifies cookie/header equality and the HMAC without logging token values. `SameSite=Strict`, host-only cookies, and controlled credentialed CORS provide additional layers. Future cookie-authenticated mutation routes must reuse the same protection unless a stronger approved mechanism replaces it.
 
 Registration, verification, and login do not rely on an existing authenticated cookie and use a dedicated rate limiter. A future frontend milestone must keep credentialed requests restricted to approved origins.
 

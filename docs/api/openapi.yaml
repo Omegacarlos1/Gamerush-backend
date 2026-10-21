@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: PlayRush Backend API
-  version: 0.4.0
-  description: M04 foundation, identity/access, player profile, and private XP history API. Authentication tokens use cookies and are never returned in JSON. XP awards are internal-only and have no HTTP route.
+  version: 0.5.0
+  description: M05 foundation, identity/access, profiles/progression, public game catalog, and authenticated server-issued game sessions. Authentication tokens use cookies and are never returned in JSON. Score submission and XP award APIs do not exist in M05.
 servers:
   - url: http://127.0.0.1:3000/api/v1
     description: Local XAMPP MariaDB development
@@ -340,6 +340,147 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /games:
+    get:
+      operationId: listGames
+      summary: List active games and their published active versions
+      description: Public and short-cacheable. Draft or retired games and versions are omitted.
+      security: []
+      responses:
+        '200':
+          description: Public game catalog
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: public, max-age=60, stale-while-revalidate=30
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GamesResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /games/{gameId}:
+    parameters:
+      - $ref: '#/components/parameters/GameId'
+    get:
+      operationId: getGame
+      summary: Get one active game and its published active version
+      description: Hidden, unknown, draft, or retired game/version combinations return the same not-found response.
+      security: []
+      responses:
+        '200':
+          description: Public game detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          description: Game is unknown or not publicly available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /games/{gameId}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/GameId'
+    post:
+      operationId: createGameSession
+      summary: Issue and start a server-controlled game session
+      description: Selects the current published active version, fixes server start/expiry, and returns high-entropy seed and nonce material exactly once. Only one open session per player, game, and mode is permitted.
+      security:
+        - accessCookie: []
+          refreshCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGameSessionRequest'
+      responses:
+        '201':
+          description: Session issued and active; credentials are returned only in this response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateGameSessionResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: CSRF validation failed or account access changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game is unknown or not publicly available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: An open session already exists for this player, game, and mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/GameSessionRateLimited'
+  /game-sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      operationId: getGameSession
+      summary: Get the authenticated player's own game session
+      description: Returns expired sessions with status expired and never re-delivers seed, nonce, or stored hashes. Unknown and other-player sessions share a not-found response.
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Owned session, including terminal or expired state
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameSessionResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session is unknown or not owned by the current player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     accessCookie:
@@ -358,6 +499,21 @@ components:
       name: X-CSRF-Token
   headers:
     RequestId:
+      schema:
+        type: string
+        format: uuid
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
       schema:
         type: string
         format: uuid
@@ -559,6 +715,180 @@ components:
               type: integer
               minimum: 1
               maximum: 100
+    GameCharacter:
+      type: object
+      additionalProperties: false
+      required: [id, slug, name, unlockLevel, cosmeticOnly]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        unlockLevel:
+          type: integer
+          minimum: 1
+        cosmeticOnly:
+          const: true
+    PublishedGameVersion:
+      type: object
+      additionalProperties: false
+      required: [id, versionNumber, rulesVersion, scoringRules, maxSessionSeconds, publishedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionNumber:
+          type: string
+        rulesVersion:
+          type: string
+        scoringRules:
+          type: object
+          additionalProperties: true
+          description: Immutable rules payload interpreted by the matching browser/server rules module.
+        maxSessionSeconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        publishedAt:
+          type: string
+          format: date-time
+    Game:
+      type: object
+      additionalProperties: false
+      required: [id, slug, name, description, activeVersion, characters]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        activeVersion:
+          $ref: '#/components/schemas/PublishedGameVersion'
+        characters:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameCharacter'
+    GamesResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [games]
+          properties:
+            games:
+              type: array
+              items:
+                $ref: '#/components/schemas/Game'
+    GameResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [game]
+          properties:
+            game:
+              $ref: '#/components/schemas/Game'
+    CreateGameSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [practice, ranked]
+    GameSession:
+      type: object
+      additionalProperties: false
+      required: [id, game, version, mode, status, startedAt, expiresAt, finishedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        game:
+          type: object
+          additionalProperties: false
+          required: [id, slug, name]
+          properties:
+            id:
+              type: string
+              format: uuid
+            slug:
+              type: string
+            name:
+              type: string
+        version:
+          $ref: '#/components/schemas/PublishedGameVersion'
+        mode:
+          type: string
+          enum: [practice, ranked]
+        status:
+          type: string
+          enum: [issued, active, submitted, accepted, rejected, expired, abandoned]
+        startedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        expiresAt:
+          type: string
+          format: date-time
+          readOnly: true
+        finishedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    SessionCredentials:
+      type: object
+      additionalProperties: false
+      required: [seed, nonce]
+      description: Returned once during creation. Retain only for this run; retrieval never returns these values.
+      properties:
+        seed:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          writeOnly: true
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          writeOnly: true
+    CreateGameSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [session, credentials]
+          properties:
+            session:
+              $ref: '#/components/schemas/GameSession'
+            credentials:
+              $ref: '#/components/schemas/SessionCredentials'
+    GameSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [session]
+          properties:
+            session:
+              $ref: '#/components/schemas/GameSession'
     HealthResponse:
       type: object
       additionalProperties: false
@@ -608,6 +938,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     AuthRateLimited:
       description: Authentication attempt rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    GameSessionRateLimited:
+      description: Dedicated game-session issuance rate limit exceeded
       content:
         application/json:
           schema:
