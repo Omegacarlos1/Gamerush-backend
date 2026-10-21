@@ -16,6 +16,7 @@ describe('environment configuration', () => {
 
     expect(config.database.port).to.equal(3306);
     expect(config.corsOrigins).to.deep.equal(['http://localhost:5173', 'http://127.0.0.1:5173']);
+    expect(config.games.sessionRateLimit).to.deep.equal({ windowMs: 60_000, max: 10 });
   });
 
   it('rejects a missing database name without exposing supplied secrets', () => {
