@@ -6,10 +6,11 @@
 - Date: 2026-10-21 (Africa/Lagos)
 - Branch: `feature/B04-profiles-xp-ledger`
 - Starting commit: `1bb894d`
+- Implementation/docs commit verified by CI: `64e7250`
 - Local runtime: Node.js 24.19.0, npm 11.17.0
 - Local engine: XAMPP MariaDB 10.4.32
 - Production/CI target: MySQL 8.4
-- Status: **LOCAL PASS — MYSQL 8.4 CI PENDING**
+- Status: **PASS**
 
 ## Scope delivered
 
@@ -60,7 +61,7 @@ XP award behavior exists only as an injected internal `PlayerService.awardXp` us
 | Missing/retired policy     | PASS    | Existing profile remains readable while creation/award fail safely                                                    |
 | M01–M03 regression         | PASS    | Complete 56-test MariaDB suite passes                                                                                 |
 | MariaDB 10.4               | PASS    | Complete suite passes on isolated `playrush_migrations_test`                                                          |
-| MySQL 8.4                  | PENDING | GitHub Actions run will be recorded after branch push                                                                 |
+| MySQL 8.4                  | PASS    | GitHub Actions run `39583211513` passed the complete workflow                                                         |
 
 ## Executed checks
 
@@ -77,6 +78,8 @@ XP award behavior exists only as an injected internal `PlayerService.awardXp` us
 | `git diff --check`             |    0 | No whitespace errors before commit                                                                 |
 
 The inherited M03 baseline was also run before implementation: format, lint, typecheck, all 46 tests, and build passed. GitHub's public Actions API independently confirmed M03 MySQL 8.4 run `39275617973` completed successfully for commit `eb43907`.
+
+GitHub Actions run [`39583211513`](https://github.com/Omegacarlos1/Gamerush-backend/actions/runs/39583211513) passed `npm ci`, MySQL trigger prerequisite configuration, format, lint, strict typecheck, all 56 tests, production build, and high-severity audit against MySQL 8.4 for commit `64e7250`.
 
 ## Resolved implementation-time failures
 
@@ -99,7 +102,6 @@ Added durable profile/progression rules: allowlisted browser fields, internal so
 
 ## Known risks and limitations
 
-- MySQL 8.4 CI remains the final acceptance gate at the time of this report draft; M04 cannot receive a final PASS until that run succeeds.
 - XP history cursor contents are opaque rather than signed. User scoping prevents cross-player access, but future public/shared pagination may require authenticated cursors.
 - `sourceReference` is returned to the owning player and must remain an opaque non-secret value in later producers.
 - The policy table relies on operational discipline to avoid overlapping active policies; deterministic latest-effective selection prevents ambiguity at runtime, but a future management workflow should validate schedule overlap.
@@ -107,16 +109,16 @@ Added durable profile/progression rules: allowlisted browser fields, internal so
 - Adjustment/correction awards are intentionally unavailable until an authorized, audited administrator workflow exists.
 - The inherited process-local rate limiter still requires a shared store before horizontal deployment.
 
-## Reviewer checklist and provisional verdict
+## Reviewer checklist and verdict
 
 - [x] M04 scope only
 - [x] All mandatory local profile/progression paths tested on isolated MariaDB
 - [x] M01–M03 regression suite remains passing
-- [ ] MySQL 8.4 CI passes for the pushed M04 implementation
+- [x] MySQL 8.4 CI passes for the pushed M04 implementation
 - [x] OpenAPI, Postman, privacy/progression docs, report, and M05 handoff supplied
 - [x] No unresolved local blocking defect
 
-**Provisional verdict: LOCAL PASS — MYSQL 8.4 CI PENDING.** Do not merge or begin M05 until CI passes and M04 is explicitly approved.
+**Verdict: PASS.** M04 is ready for review. Do not merge or begin M05 until M04 is explicitly approved.
 
 ## Pull request description
 
@@ -126,7 +128,7 @@ Implemented authenticated self-profile creation/read/update, CSRF-protected stri
 
 ### Validation
 
-Locally on XAMPP MariaDB 10.4.32: format, lint, strict typecheck, 56 Mocha tests, build, high-severity audit, OpenAPI/Postman parsing, and five repeated 20-award concurrency tests pass. MySQL 8.4 CI is pending the feature-branch push.
+Locally on XAMPP MariaDB 10.4.32: format, lint, strict typecheck, 56 Mocha tests, build, high-severity audit, OpenAPI/Postman parsing, and five repeated 20-award concurrency tests pass. GitHub Actions run `39583211513` passes the complete workflow on MySQL 8.4.
 
 ### Risks
 
