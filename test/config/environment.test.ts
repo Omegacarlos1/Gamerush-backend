@@ -10,6 +10,8 @@ describe('environment configuration', () => {
       DB_PASSWORD: 'local-password',
       DB_NAME: 'playrush_dev',
       CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
+      AUTH_ACCESS_TOKEN_SECRET: 'local-access-secret-at-least-32-characters',
+      AUTH_CSRF_SECRET: 'local-csrf-secret-at-least-32-characters',
     });
 
     expect(config.database.port).to.equal(3306);
@@ -43,6 +45,9 @@ describe('environment configuration', () => {
         DB_PASSWORD: '',
         DB_NAME: 'playrush',
         CORS_ORIGINS: '*',
+        AUTH_ACCESS_TOKEN_SECRET: 'production-access-secret-at-least-32-characters',
+        AUTH_CSRF_SECRET: 'production-csrf-secret-at-least-32-characters',
+        AUTH_COOKIE_SECURE: 'false',
       }),
     )
       .to.throw(EnvironmentValidationError)
@@ -50,6 +55,7 @@ describe('environment configuration', () => {
         expect(error.message).to.include('wildcard origins');
         expect(error.message).to.include('must not be blank');
         expect(error.message).to.include('least-privilege');
+        expect(error.message).to.include('must be true in production');
         return true;
       });
   });

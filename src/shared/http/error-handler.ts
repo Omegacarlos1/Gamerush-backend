@@ -41,6 +41,13 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
       path: request.path,
       statusCode,
       errorType: error instanceof Error ? error.name : 'UnknownError',
+      errorCode:
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : undefined,
     };
 
     if (statusCode >= 500) {

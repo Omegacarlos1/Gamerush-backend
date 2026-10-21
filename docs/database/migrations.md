@@ -43,6 +43,8 @@ The automated lifecycle suite defaults to `playrush_migrations_test`. It may rol
 
 After a successful suite, the test schema is left fully migrated and seeded for inspection in phpMyAdmin.
 
+M03 requires no new migration: the approved `0001_identity` tables already support credential hashes, verification tokens, refresh-token families, replacement linkage, revocation, reuse detection, and expiry. M03 adds application behavior only and does not modify any applied SQL file.
+
 ## Seed contents
 
 Seeds are deterministic and repeat-safe. They contain two roles, one endless-runner game/version, three cosmetic characters, one progression policy, two achievement definitions, three weekly placement badges, and four top-10 virtual reward rules. They contain no usable accounts, passwords, sessions, or tokens.

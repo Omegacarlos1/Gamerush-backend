@@ -15,6 +15,8 @@ export function createTestConfig(overrides: Partial<NodeJS.ProcessEnv> = {}): Ap
     DB_PASSWORD: 'test-only-password',
     DB_NAME: 'playrush_test',
     CORS_ORIGINS: 'http://localhost:5173',
+    AUTH_ACCESS_TOKEN_SECRET: 'test-access-token-secret-at-least-32-characters',
+    AUTH_CSRF_SECRET: 'test-csrf-token-secret-at-least-32-characters',
     ...overrides,
   });
 }

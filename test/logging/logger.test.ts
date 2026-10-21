@@ -20,6 +20,8 @@ describe('structured logger', () => {
       {
         password: 'top-secret-password',
         token: 'top-secret-token',
+        refreshToken: 'top-secret-refresh-token',
+        csrfToken: 'top-secret-csrf-token',
         headers: { authorization: 'Bearer top-secret-token' },
       },
       'redaction check',
@@ -27,6 +29,8 @@ describe('structured logger', () => {
 
     expect(output).not.to.include('top-secret-password');
     expect(output).not.to.include('top-secret-token');
+    expect(output).not.to.include('top-secret-refresh-token');
+    expect(output).not.to.include('top-secret-csrf-token');
     expect(output).to.include('[REDACTED]');
   });
 });

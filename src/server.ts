@@ -6,6 +6,10 @@ import { createApp } from './app.js';
 import { EnvironmentValidationError, parseEnvironment } from './config/environment.js';
 import { checkMySqlConnection, createMySqlPool } from './infrastructure/database/mysql-pool.js';
 import { HealthService } from './modules/health/application/health.service.js';
+import { AuthService } from './modules/auth/application/auth.service.js';
+import { Argon2PasswordHasher } from './modules/auth/infrastructure/argon2-password-hasher.js';
+import { MySqlAuthRepository } from './modules/auth/infrastructure/mysql-auth.repository.js';
+import { UnconfiguredVerificationDelivery } from './modules/auth/infrastructure/verification-delivery.js';
 import { createLogger } from './shared/logging/logger.js';
 
 async function startServer(): Promise<void> {
@@ -26,7 +30,14 @@ async function startServer(): Promise<void> {
   const pool = createMySqlPool(config);
   const databaseHealthCheck = (): Promise<void> => checkMySqlConnection(pool);
   const healthService = new HealthService(databaseHealthCheck, logger);
-  const app = createApp({ config, logger, healthService });
+  const authService = new AuthService(
+    new MySqlAuthRepository(pool),
+    new Argon2PasswordHasher(),
+    new UnconfiguredVerificationDelivery(),
+    config,
+    logger,
+  );
+  const app = createApp({ config, logger, healthService, authService });
   const server = createServer(app);
 
   try {
