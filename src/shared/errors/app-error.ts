@@ -51,3 +51,10 @@ export class ConflictError extends AppError {
     this.name = 'ConflictError';
   }
 }
+
+export class NotFoundError extends AppError {
+  public constructor(code: string, message: string) {
+    super(404, code, message);
+    this.name = 'NotFoundError';
+  }
+}

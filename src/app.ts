@@ -10,6 +10,8 @@ import type { HealthService } from './modules/health/application/health.service.
 import { createHealthRouter } from './modules/health/presentation/health.routes.js';
 import type { AuthService } from './modules/auth/application/auth.service.js';
 import { createAuthRouter } from './modules/auth/presentation/auth.routes.js';
+import type { PlayerService } from './modules/players/application/player.service.js';
+import { createPlayerRouter } from './modules/players/presentation/player.routes.js';
 import { CorsOriginError } from './shared/errors/app-error.js';
 import { createErrorHandler } from './shared/http/error-handler.js';
 import { notFoundHandler } from './shared/http/not-found.js';
@@ -20,6 +22,7 @@ export interface AppDependencies {
   readonly logger: Logger;
   readonly healthService: HealthService;
   readonly authService?: AuthService;
+  readonly playerService?: PlayerService;
 }
 
 export function createApp({
@@ -27,6 +30,7 @@ export function createApp({
   logger,
   healthService,
   authService,
+  playerService,
 }: AppDependencies): Express {
   const app = express();
 
@@ -76,6 +80,9 @@ export function createApp({
   app.use('/api/v1/health', createHealthRouter(healthService));
   if (authService !== undefined) {
     app.use('/api/v1/auth', createAuthRouter(authService, config));
+  }
+  if (authService !== undefined && playerService !== undefined) {
+    app.use('/api/v1/players', createPlayerRouter(playerService, authService, config));
   }
   app.use(notFoundHandler);
   app.use(createErrorHandler(logger));

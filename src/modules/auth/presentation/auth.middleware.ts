@@ -4,6 +4,7 @@ import type { AppConfig } from '../../../config/environment.js';
 import { ForbiddenError } from '../../../shared/errors/app-error.js';
 import type { AuthService } from '../application/auth.service.js';
 import type { AccountRole, AuthenticatedUser } from '../domain/auth.types.js';
+import { parseRefreshToken } from '../infrastructure/auth-token.service.js';
 import { authCookieNames, readCookie } from './auth.cookies.js';
 
 const authenticatedUserKey = 'authenticatedUser';
@@ -30,6 +31,39 @@ export function requireRole(role: AccountRole): RequestHandler {
     }
     next();
   };
+}
+
+export function requireCsrfProtection(service: AuthService, config: AppConfig): RequestHandler {
+  return (request, _response, next): void => {
+    try {
+      validateCsrfRequest(request, service, config);
+      next();
+    } catch (error: unknown) {
+      next(error);
+    }
+  };
+}
+
+export function validateCsrfRequest(
+  request: Request,
+  service: AuthService,
+  config: AppConfig,
+): string {
+  const names = authCookieNames(config);
+  const refreshToken = readCookie(request, names.refresh);
+  const csrfCookie = readCookie(request, names.csrf);
+  const csrfHeader = request.headers['x-csrf-token'];
+  const parsed = refreshToken === null ? null : parseRefreshToken(refreshToken);
+  if (
+    refreshToken === null ||
+    parsed === null ||
+    csrfCookie === null ||
+    typeof csrfHeader !== 'string' ||
+    !service.verifyCsrf(parsed.sessionPublicId, csrfCookie, csrfHeader)
+  ) {
+    throw new ForbiddenError('CSRF_VALIDATION_FAILED', 'CSRF validation failed');
+  }
+  return refreshToken;
 }
 
 export function authenticatedUser(response: Response): AuthenticatedUser {
