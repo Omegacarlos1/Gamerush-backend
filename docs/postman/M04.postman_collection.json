@@ -1,0 +1,219 @@
+{
+  "info": {
+    "_postman_id": "c63c6c8b-7cc7-4b23-9a3f-1c5fd2930004",
+    "name": "PlayRush M04 Profiles and XP Ledger",
+    "description": "Runnable M04 player-profile and private XP-history examples. Login first so Postman retains the access, refresh, and CSRF cookies. XP awards are internal-only and intentionally absent.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3000/api/v1", "type": "string" },
+    { "key": "email", "value": "m04-player@example.test", "type": "string" },
+    { "key": "password", "value": "", "type": "string" },
+    { "key": "csrfToken", "value": "", "type": "string" },
+    { "key": "xpCursor", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Login verified player",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login",
+        "description": "Uses an already verified M03 player. Postman stores the returned host-only cookies."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login accepted', () => pm.response.to.have.status(200));",
+              "pm.test('tokens stay out of JSON', () => { const text = pm.response.text(); pm.expect(text).not.to.include('accessToken'); pm.expect(text).not.to.include('refreshToken'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get my profile",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/players/me",
+        "description": "Creates a missing profile deterministically and returns only the current player's display/progression data."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('profile returned', () => pm.response.to.have.status(200));",
+              "pm.test('private identity is absent', () => { const profile = pm.response.json().data.profile; pm.expect(profile).not.to.have.property('email'); pm.expect(profile).not.to.have.property('role'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update my profile",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('display fields updated', () => { pm.response.to.have.status(200); const profile = pm.response.json().data.profile; pm.expect(profile.displayName).to.eql('Rush Pilot'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"displayName\": \"Rush Pilot\",\n  \"bio\": \"Plays fair.\"\n}"
+        },
+        "url": "{{baseUrl}}/players/me"
+      }
+    },
+    {
+      "name": "Reject protected profile fields",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('server-controlled progression rejected', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('INVALID_REQUEST'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"totalXp\": 500,\n  \"level\": 9\n}" },
+        "url": "{{baseUrl}}/players/me"
+      }
+    },
+    {
+      "name": "Reject profile update without CSRF",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"bio\": \"Missing CSRF\"\n}" },
+        "url": "{{baseUrl}}/players/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF rejected', () => { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('CSRF_VALIDATION_FAILED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get my XP history",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/players/me/xp-history?limit=20",
+        "description": "Returns only this player's newest-first ledger page. Empty history is a successful response."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('history page returned', () => pm.response.to.have.status(200));",
+              "pm.test('internal fields are absent', () => { const items = pm.response.json().data.items; items.forEach((item) => { pm.expect(item).not.to.have.property('id'); pm.expect(item).not.to.have.property('metadata'); }); });",
+              "const cursor = pm.response.json().pagination.nextCursor; if (cursor) pm.collectionVariables.set('xpCursor', cursor);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get next XP history page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/players/me/xp-history?limit=20&cursor={{xpCursor}}",
+        "description": "Run only when the prior response supplies nextCursor."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('stable next page returned', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid XP cursor",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/players/me/xp-history?cursor=not-a-cursor"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('invalid cursor rejected', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('INVALID_REQUEST'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject unauthenticated profile read",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/players/me",
+        "description": "Cookie sending is disabled for this request.",
+        "protocolProfileBehavior": { "disableCookies": true }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('authentication required', () => pm.response.to.have.status(401));"]
+          }
+        }
+      ]
+    }
+  ]
+}

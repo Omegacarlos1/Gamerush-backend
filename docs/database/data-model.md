@@ -45,7 +45,7 @@ erDiagram
 
 ## Progression and competition
 
-`xp_ledger` is append-only and idempotent. Player totals are cached in `player_profiles`; future services must update the cache and ledger in one transaction. Character unlocks, achievements, badges, and reward grants use uniqueness/idempotency keys.
+`xp_ledger` is append-only and globally idempotent. M04 locks the relevant `player_profiles` row, appends one ledger event, and updates the cached total/level in the same transaction. Policy version and resulting level are retained in ledger metadata for repeat-safe original-effect responses. Character unlocks, achievements, badges, and reward grants use separate uniqueness/idempotency keys and remain future milestone behavior.
 
 `leaderboard_periods` owns UTC start/end/grace boundaries. A `leaderboard_entry` is unique per period/game/player and references one verified score. Its ranking index contains score, server finish time, and session UUID for deterministic ordering. Final top-10 results are frozen in `leaderboard_placements`. Versioned `leaderboard_reward_rules` preserve the approved virtual XP/badge amounts for places 1, 2, 3, and 4–10. `reward_grants` links the rule used, permits at most one reward type per period/player, and also has a global idempotency key.
 

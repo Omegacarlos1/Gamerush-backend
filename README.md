@@ -66,8 +66,11 @@ The integration suite defaults to `playrush_migrations_test`, `root`, and a blan
 - `POST /api/v1/auth/logout` — revoke the session and clear cookies
 - `GET /api/v1/auth/me` — return the current verified active account
 - `GET /api/v1/auth/admin-check` — M03-only role-enforcement probe
+- `GET /api/v1/players/me` — create/read the authenticated player's profile
+- `PATCH /api/v1/players/me` — update only approved display fields with `X-CSRF-Token`
+- `GET /api/v1/players/me/xp-history` — read private cursor-paginated XP history
 - Any unknown route — standardized `404` JSON error
 
-Authentication cookies are host-only and `SameSite=Strict`; production requires Secure `__Host-` names. Refresh and cookie-backed logout require the readable CSRF cookie value in `X-CSRF-Token`. No email vendor is configured; tests inject a deterministic verification-delivery adapter.
+Authentication cookies are host-only and `SameSite=Strict`; production requires Secure `__Host-` names. Refresh, cookie-backed logout, and profile PATCH require the readable CSRF cookie value in `X-CSRF-Token`. XP awards are internal-only, server-controlled, idempotent transactions; there is no client award endpoint. No email vendor is configured; tests inject a deterministic verification-delivery adapter.
 
-See [architecture](docs/architecture.md), [authentication security](docs/security/authentication.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M03 examples](docs/postman/M03-examples.md).
+See [architecture](docs/architecture.md), [authentication security](docs/security/authentication.md), [profile/progression policy](docs/progression.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M04 examples](docs/postman/M04-examples.md).
