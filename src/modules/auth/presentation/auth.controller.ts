@@ -1,11 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import type { AppConfig } from '../../../config/environment.js';
-import { ForbiddenError } from '../../../shared/errors/app-error.js';
 import type { AuthService } from '../application/auth.service.js';
-import { parseRefreshToken } from '../infrastructure/auth-token.service.js';
 import { authCookieNames, clearAuthCookies, readCookie, setAuthCookies } from './auth.cookies.js';
-import { authenticatedUser, nextAsync, requestMetadata } from './auth.middleware.js';
+import {
+  authenticatedUser,
+  nextAsync,
+  requestMetadata,
+  validateCsrfRequest,
+} from './auth.middleware.js';
 import { loginSchema, parseBody, registerSchema, verifyEmailSchema } from './auth.schemas.js';
 
 export class AuthController {
@@ -51,7 +54,7 @@ export class AuthController {
 
   public readonly refresh = (request: Request, response: Response, next: NextFunction): void => {
     nextAsync(async () => {
-      const refreshToken = this.requireCsrf(request);
+      const refreshToken = validateCsrfRequest(request, this.service, this.config);
       const result = await this.service.refresh(refreshToken, requestMetadata(request));
       setAuthCookies(response, this.config, result.tokens);
       response.status(200).json({
@@ -64,7 +67,7 @@ export class AuthController {
     nextAsync(async () => {
       const names = authCookieNames(this.config);
       const refreshToken = readCookie(request, names.refresh);
-      if (refreshToken !== null) this.requireCsrf(request);
+      if (refreshToken !== null) validateCsrfRequest(request, this.service, this.config);
       await this.service.logout(refreshToken);
       clearAuthCookies(response, this.config);
       response.status(204).send();
@@ -78,22 +81,4 @@ export class AuthController {
   public readonly adminCheck = (_request: Request, response: Response): void => {
     response.status(200).json({ data: { authorized: true } });
   };
-
-  private requireCsrf(request: Request): string {
-    const names = authCookieNames(this.config);
-    const refreshToken = readCookie(request, names.refresh);
-    const csrfCookie = readCookie(request, names.csrf);
-    const csrfHeader = request.headers['x-csrf-token'];
-    const parsed = refreshToken === null ? null : parseRefreshToken(refreshToken);
-    if (
-      refreshToken === null ||
-      parsed === null ||
-      csrfCookie === null ||
-      typeof csrfHeader !== 'string' ||
-      !this.service.verifyCsrf(parsed.sessionPublicId, csrfCookie, csrfHeader)
-    ) {
-      throw new ForbiddenError('CSRF_VALIDATION_FAILED', 'CSRF validation failed');
-    }
-    return refreshToken;
-  }
 }

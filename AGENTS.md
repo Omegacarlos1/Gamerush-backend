@@ -114,3 +114,10 @@ Before performing Git operations, inspect the current branch, working tree and r
 - Browser authentication uses host-only HttpOnly access/refresh cookies, Secure `__Host-` names in production, and signed session-bound CSRF protection for cookie-authenticated mutations.
 - Refresh tokens rotate transactionally. Reuse revokes the complete token family and must remain safe under concurrent requests.
 - Authorization checks live account/session/role state; a valid JWT alone is not sufficient.
+
+## Profile and progression conventions
+
+- Browser clients may update only explicitly allowlisted display fields; XP, levels, scores, roles, statuses, unlocks and ownership identifiers remain server-controlled.
+- XP award operations are internal-only, source-allowlisted, globally idempotent and transactionally update the append-only ledger plus cached profile progression under a row lock.
+- Progression calculations load an active versioned database policy. Do not guess a policy when none is active, and preserve the original policy/effect for idempotent replay.
+- Private XP history is scoped to the authenticated player and must not expose ledger database IDs or internal metadata.

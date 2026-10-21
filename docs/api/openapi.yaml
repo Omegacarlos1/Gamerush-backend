@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: PlayRush Backend API
-  version: 0.3.0
-  description: M03 foundation and identity/access API. Authentication tokens use cookies and are never returned in JSON.
+  version: 0.4.0
+  description: M04 foundation, identity/access, player profile, and private XP history API. Authentication tokens use cookies and are never returned in JSON. XP awards are internal-only and have no HTTP route.
 servers:
   - url: http://127.0.0.1:3000/api/v1
     description: Local XAMPP MariaDB development
@@ -229,6 +229,117 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /players/me:
+    get:
+      operationId: getMyPlayerProfile
+      summary: Read the authenticated player's profile and progression cache
+      description: Creates a missing profile deterministically using the active progression policy. The response contains no email, role, or another player's data.
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Current player profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfileResponse'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    patch:
+      operationId: updateMyPlayerProfile
+      summary: Update approved display fields on the authenticated player's profile
+      description: Requires the signed session-bound CSRF cookie value in X-CSRF-Token. Unknown and protected fields, including XP, level, role, status, scores, unlocks, and user IDs, are rejected.
+      security:
+        - accessCookie: []
+          refreshCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerProfilePatch'
+      responses:
+        '200':
+          description: Updated player profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfileResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: CSRF validation failed or the account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /players/me/xp-history:
+    get:
+      operationId: getMyXpHistory
+      summary: Read the authenticated player's private XP ledger history
+      description: Returns a stable newest-first page ordered by ledger creation time and ID. The cursor is opaque and scoped by the authenticated player; internal metadata and database IDs are not exposed.
+      security:
+        - accessCookie: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque nextCursor returned by the previous page.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          required: false
+          description: Page size; defaults to 20.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Private XP history page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/XpHistoryResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     accessCookie:
@@ -333,6 +444,121 @@ components:
             accessTokenExpiresAt:
               type: string
               format: date-time
+    PlayerProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 80
+          description: Trimmed display name; null clears it.
+        bio:
+          type: [string, 'null']
+          maxLength: 500
+          description: Trimmed profile biography; null clears it.
+    PlayerProfile:
+      type: object
+      additionalProperties: false
+      required:
+        [id, username, displayName, bio, totalXp, level, allTimeBestScore, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: [string, 'null']
+        bio:
+          type: [string, 'null']
+        totalXp:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          readOnly: true
+        level:
+          type: integer
+          minimum: 1
+          readOnly: true
+        allTimeBestScore:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    PlayerProfileResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [profile]
+          properties:
+            profile:
+              $ref: '#/components/schemas/PlayerProfile'
+    XpHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [amount, balanceAfter, sourceType, sourceReference, createdAt]
+      properties:
+        amount:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        balanceAfter:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        sourceType:
+          type: string
+          enum: [gameplay, leaderboard_reward, achievement, admin_adjustment, correction]
+        sourceReference:
+          type: string
+          maxLength: 191
+          description: Opaque server provenance reference.
+        createdAt:
+          type: string
+          format: date-time
+    XpHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/XpHistoryItem'
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [nextCursor, limit]
+          properties:
+            nextCursor:
+              type: [string, 'null']
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
     HealthResponse:
       type: object
       additionalProperties: false
@@ -387,7 +613,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     ServiceUnavailable:
-      description: Database connectivity check failed
+      description: A required database resource or active policy is unavailable
       content:
         application/json:
           schema:

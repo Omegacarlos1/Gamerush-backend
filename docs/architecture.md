@@ -46,3 +46,11 @@ The schema is organized around identity, immutable game/rules versions, gameplay
 The identity module follows domain/application/infrastructure/presentation boundaries. `AuthService` owns account and session rules through injected repository, password-hashing, token-delivery, clock, and logging dependencies. `MySqlAuthRepository` implements parameterized queries and exposes explicit transaction-scoped operations; controllers only validate HTTP input, manage cookies, and map service results.
 
 Registration and verification reuse the M02 identity tables without editing applied migrations. Authentication uses Argon2id password hashes, signed short-lived access JWTs, hashed rotating refresh tokens, live session/account checks, and signed session-bound CSRF tokens. Refresh row locks make replacement/replay outcomes deterministic under concurrency. See `docs/security/authentication.md` for the transport and account-state policy.
+
+## M04 profile and progression architecture
+
+The player module adds domain, application, MySQL repository, and Express presentation layers. The HTTP surface contains only authenticated self-profile and private history reads plus a CSRF-protected display-field update. XP awards are an injected internal application use case, not a route.
+
+The application loads the active versioned progression policy through an injected policy service. Profile creation uses an idempotent insert followed by a locking/current read. Awards lock the profile row, recheck the global idempotency key after serialization, append the ledger event, and update cached total/level in one transaction with bounded deadlock retry. The original policy version and resulting level are stored in ledger metadata so idempotent replay returns the original effect.
+
+History uses a versioned opaque cursor over the existing `(user_id, created_at, id)` ordering and remains scoped to the authenticated player. Database IDs and internal ledger metadata do not cross the HTTP boundary. M04 uses the existing seven migrations unchanged; see `docs/progression.md` for policy, privacy, and failure behavior.

@@ -10,6 +10,9 @@ import { AuthService } from './modules/auth/application/auth.service.js';
 import { Argon2PasswordHasher } from './modules/auth/infrastructure/argon2-password-hasher.js';
 import { MySqlAuthRepository } from './modules/auth/infrastructure/mysql-auth.repository.js';
 import { UnconfiguredVerificationDelivery } from './modules/auth/infrastructure/verification-delivery.js';
+import { PlayerService } from './modules/players/application/player.service.js';
+import { ProgressionPolicyService } from './modules/players/application/progression-policy.service.js';
+import { MySqlPlayerRepository } from './modules/players/infrastructure/mysql-player.repository.js';
 import { createLogger } from './shared/logging/logger.js';
 
 async function startServer(): Promise<void> {
@@ -37,7 +40,11 @@ async function startServer(): Promise<void> {
     config,
     logger,
   );
-  const app = createApp({ config, logger, healthService, authService });
+  const playerService = new PlayerService(
+    new MySqlPlayerRepository(pool),
+    new ProgressionPolicyService(),
+  );
+  const app = createApp({ config, logger, healthService, authService, playerService });
   const server = createServer(app);
 
   try {

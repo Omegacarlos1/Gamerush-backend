@@ -45,6 +45,8 @@ After a successful suite, the test schema is left fully migrated and seeded for 
 
 M03 requires no new migration: the approved `0001_identity` tables already support credential hashes, verification tokens, refresh-token families, replacement linkage, revocation, reuse detection, and expiry. M03 adds application behavior only and does not modify any applied SQL file.
 
+M04 also requires no new migration. The immutable `0003_progression` definition already supplies bounded profile fields, cached XP/level values, versioned policies, the global XP idempotency key, stable history ordering index, JSON provenance metadata, and append-only update/delete triggers. M04 consumes those structures through parameterized transactional repository operations without changing migrations `0001`–`0007`.
+
 ## Seed contents
 
 Seeds are deterministic and repeat-safe. They contain two roles, one endless-runner game/version, three cosmetic characters, one progression policy, two achievement definitions, three weekly placement badges, and four top-10 virtual reward rules. They contain no usable accounts, passwords, sessions, or tokens.

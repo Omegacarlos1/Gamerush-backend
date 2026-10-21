@@ -10,6 +10,9 @@ export { AuthService } from './modules/auth/application/auth.service.js';
 export { Argon2PasswordHasher } from './modules/auth/infrastructure/argon2-password-hasher.js';
 export { MySqlAuthRepository } from './modules/auth/infrastructure/mysql-auth.repository.js';
 export { UnconfiguredVerificationDelivery } from './modules/auth/infrastructure/verification-delivery.js';
+export { PlayerService } from './modules/players/application/player.service.js';
+export { ProgressionPolicyService } from './modules/players/application/progression-policy.service.js';
+export { MySqlPlayerRepository } from './modules/players/infrastructure/mysql-player.repository.js';
 export {
   HealthService,
   type DatabaseHealthCheck,
