@@ -21,6 +21,9 @@ const environmentSchema = z
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
     GAME_SESSION_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
     GAME_SESSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+    SCORE_SUBMISSION_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
+    SCORE_SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(5),
+    SCORE_EVIDENCE_MAX_BYTES: z.coerce.number().int().min(1_024).max(100_000).default(65_536),
     AUTH_ACCESS_TOKEN_SECRET: z.string().min(32),
     AUTH_CSRF_SECRET: z.string().min(32),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3_600).default(900),
@@ -115,6 +118,11 @@ export interface AppConfig {
       readonly windowMs: number;
       readonly max: number;
     };
+    readonly scoreSubmissionRateLimit: {
+      readonly windowMs: number;
+      readonly max: number;
+    };
+    readonly scoreEvidenceMaxBytes: number;
   };
   readonly database: {
     readonly host: string;
@@ -180,6 +188,11 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): AppConfig {
         windowMs: result.data.GAME_SESSION_RATE_LIMIT_WINDOW_MS,
         max: result.data.GAME_SESSION_RATE_LIMIT_MAX,
       },
+      scoreSubmissionRateLimit: {
+        windowMs: result.data.SCORE_SUBMISSION_RATE_LIMIT_WINDOW_MS,
+        max: result.data.SCORE_SUBMISSION_RATE_LIMIT_MAX,
+      },
+      scoreEvidenceMaxBytes: result.data.SCORE_EVIDENCE_MAX_BYTES,
     },
     database: {
       host: result.data.DB_HOST,

@@ -14,7 +14,10 @@ import { PlayerService } from './modules/players/application/player.service.js';
 import { ProgressionPolicyService } from './modules/players/application/progression-policy.service.js';
 import { MySqlPlayerRepository } from './modules/players/infrastructure/mysql-player.repository.js';
 import { GameService } from './modules/games/application/game.service.js';
+import { ScoreSubmissionService } from './modules/games/application/score-submission.service.js';
+import { DeterministicRunnerVerifier } from './modules/games/infrastructure/deterministic-runner-verifier.js';
 import { MySqlGameRepository } from './modules/games/infrastructure/mysql-game.repository.js';
+import { MySqlScoreSubmissionRepository } from './modules/games/infrastructure/mysql-score-submission.repository.js';
 import { createLogger } from './shared/logging/logger.js';
 
 async function startServer(): Promise<void> {
@@ -42,11 +45,15 @@ async function startServer(): Promise<void> {
     config,
     logger,
   );
-  const playerService = new PlayerService(
-    new MySqlPlayerRepository(pool),
-    new ProgressionPolicyService(),
-  );
+  const progressionPolicy = new ProgressionPolicyService();
+  const playerService = new PlayerService(new MySqlPlayerRepository(pool), progressionPolicy);
   const gameService = new GameService(new MySqlGameRepository(pool), logger);
+  const scoreSubmissionService = new ScoreSubmissionService(
+    new MySqlScoreSubmissionRepository(pool),
+    new DeterministicRunnerVerifier(),
+    progressionPolicy,
+    logger,
+  );
   const app = createApp({
     config,
     logger,
@@ -54,6 +61,7 @@ async function startServer(): Promise<void> {
     authService,
     playerService,
     gameService,
+    scoreSubmissionService,
   });
   const server = createServer(app);
 

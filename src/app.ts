@@ -13,10 +13,15 @@ import { createAuthRouter } from './modules/auth/presentation/auth.routes.js';
 import type { PlayerService } from './modules/players/application/player.service.js';
 import { createPlayerRouter } from './modules/players/presentation/player.routes.js';
 import type { GameService } from './modules/games/application/game.service.js';
+import type { ScoreSubmissionService } from './modules/games/application/score-submission.service.js';
 import {
   createGameRouter,
   createGameSessionRouter,
 } from './modules/games/presentation/game.routes.js';
+import {
+  createScoreSessionRouter,
+  createScoreSubmissionRouter,
+} from './modules/games/presentation/score-submission.routes.js';
 import { CorsOriginError } from './shared/errors/app-error.js';
 import { createErrorHandler } from './shared/http/error-handler.js';
 import { notFoundHandler } from './shared/http/not-found.js';
@@ -29,6 +34,7 @@ export interface AppDependencies {
   readonly authService?: AuthService;
   readonly playerService?: PlayerService;
   readonly gameService?: GameService;
+  readonly scoreSubmissionService?: ScoreSubmissionService;
 }
 
 export function createApp({
@@ -38,6 +44,7 @@ export function createApp({
   authService,
   playerService,
   gameService,
+  scoreSubmissionService,
 }: AppDependencies): Express {
   const app = express();
 
@@ -96,6 +103,16 @@ export function createApp({
   }
   if (gameService !== undefined && authService !== undefined) {
     app.use('/api/v1/game-sessions', createGameSessionRouter(gameService, authService, config));
+  }
+  if (scoreSubmissionService !== undefined && authService !== undefined) {
+    app.use(
+      '/api/v1/game-sessions',
+      createScoreSessionRouter(scoreSubmissionService, authService, config),
+    );
+    app.use(
+      '/api/v1/score-submissions',
+      createScoreSubmissionRouter(scoreSubmissionService, authService, config),
+    );
   }
   app.use(notFoundHandler);
   app.use(createErrorHandler(logger));

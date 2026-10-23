@@ -7,7 +7,10 @@ export class ProgressionPolicyService {
     transaction: PlayerTransaction,
     at: Date,
   ): Promise<ProgressionPolicyRecord> {
-    const policy = await transaction.findActiveProgressionPolicy(at);
+    return this.validate(await transaction.findActiveProgressionPolicy(at));
+  }
+
+  public validate(policy: ProgressionPolicyRecord | null): ProgressionPolicyRecord {
     if (
       policy?.roundingMode !== 'floor' ||
       !Number.isSafeInteger(policy.scorePointsPerXp) ||
