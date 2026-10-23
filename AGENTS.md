@@ -121,3 +121,10 @@ Before performing Git operations, inspect the current branch, working tree and r
 - XP award operations are internal-only, source-allowlisted, globally idempotent and transactionally update the append-only ledger plus cached profile progression under a row lock.
 - Progression calculations load an active versioned database policy. Do not guess a policy when none is active, and preserve the original policy/effect for idempotent replay.
 - Private XP history is scoped to the authenticated player and must not expose ledger database IDs or internal metadata.
+
+## Game catalog and session conventions
+
+- Public catalog responses expose only active games joined to their selected published immutable version; session creation re-resolves the current database version rather than trusting cached or client version data.
+- Game-session creation requires live cookie authentication and signed session-bound CSRF, accepts only an allowlisted mode, and derives owner, version, state, start, and expiry on the server.
+- Deliver independently random seed/nonce material once, persist only approved hashes, mark session responses `no-store`, and keep raw and hashed material out of logs and retrieval responses.
+- Enforce one open session per player/game/mode transactionally, owner-scope retrieval, expire from server UTC, and permit only explicit lifecycle transitions. Browser scores/evidence remain non-authoritative until verified by a later trusted workflow.

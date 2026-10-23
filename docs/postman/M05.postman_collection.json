@@ -1,0 +1,316 @@
+{
+  "info": {
+    "_postman_id": "c63c6c8b-7cc7-4b23-9a3f-1c5fd2930005",
+    "name": "PlayRush M05 Games and Sessions",
+    "description": "Runnable M05 public game-catalog and authenticated server-issued session examples. Login first so Postman retains cookies. Seed and nonce are asserted but deliberately not stored as collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3000/api/v1", "type": "string" },
+    { "key": "gameId", "value": "10000000-0000-4000-8000-000000000001", "type": "string" },
+    { "key": "unknownGameId", "value": "59999999-0000-4000-8000-000000000099", "type": "string" },
+    { "key": "sessionId", "value": "", "type": "string" },
+    { "key": "email", "value": "m05-player@example.test", "type": "string" },
+    { "key": "password", "value": "", "type": "string" },
+    { "key": "csrfToken", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "List public games",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/games",
+        "description": "Returns active games only, each with its published active immutable version and active cosmetic characters."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('catalog returned', () => pm.response.to.have.status(200));",
+              "pm.test('catalog is short-cacheable', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('public, max-age=60, stale-while-revalidate=30'));",
+              "const games = pm.response.json().data.games; if (games.length) pm.collectionVariables.set('gameId', games[0].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get public game detail",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/games/{{gameId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('game detail returned', () => pm.response.to.have.status(200));",
+              "pm.test('published rules included', () => { const game = pm.response.json().data.game; pm.expect(game.activeVersion.rulesVersion).to.be.a('string'); pm.expect(game.activeVersion.maxSessionSeconds).to.be.a('number'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hide unknown or unavailable game",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/games/{{unknownGameId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('hidden game is not disclosed', () => { pm.response.to.have.status(404); pm.expect(pm.response.json().error.code).to.eql('GAME_NOT_FOUND'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login verified player",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login",
+        "description": "Uses an already verified M03 player. Postman stores the host-only authentication and CSRF cookies."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('login accepted', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create ranked game session",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('session created', () => pm.response.to.have.status(201));",
+              "pm.test('session is never cacheable', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));",
+              "pm.test('one-time credentials and no hashes', () => { const body = pm.response.json(); pm.expect(body.data.credentials.seed).to.match(/^[A-Za-z0-9_-]{43}$/); pm.expect(body.data.credentials.nonce).to.match(/^[A-Za-z0-9_-]{43}$/); pm.expect(pm.response.text()).not.to.include('seedHash'); pm.expect(pm.response.text()).not.to.include('nonceHash'); });",
+              "pm.collectionVariables.set('sessionId', pm.response.json().data.session.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"mode\": \"ranked\"\n}" },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions"
+      }
+    },
+    {
+      "name": "Get own game session",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}",
+        "description": "Returns the owner-visible state but never re-delivers seed, nonce, or hashes."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('owned session returned', () => pm.response.to.have.status(200));",
+              "pm.test('credentials are not retrievable', () => { const text = pm.response.text(); pm.expect(text).not.to.include('credentials'); pm.expect(text).not.to.include('seedHash'); pm.expect(text).not.to.include('nonceHash'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject duplicate ranked session",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('duplicate is rejected', () => { pm.response.to.have.status(409); pm.expect(pm.response.json().error.code).to.eql('GAME_SESSION_ALREADY_ACTIVE'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"mode\": \"ranked\"\n}" },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions"
+      }
+    },
+    {
+      "name": "Reject invalid mode",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('invalid mode rejected', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('INVALID_REQUEST'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"mode\": \"tournament\"\n}" },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions"
+      }
+    },
+    {
+      "name": "Reject client-controlled session fields",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('server fields rejected', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('INVALID_REQUEST'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mode\": \"practice\",\n  \"versionId\": \"client-choice\",\n  \"status\": \"accepted\",\n  \"startedAt\": \"2020-01-01T00:00:00Z\",\n  \"score\": 999999,\n  \"xp\": 999999\n}"
+        },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions"
+      }
+    },
+    {
+      "name": "Reject session creation without CSRF",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"mode\": \"practice\"\n}" },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF rejected', () => { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('CSRF_VALIDATION_FAILED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject unauthenticated session creation",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"mode\": \"practice\"\n}" },
+        "url": "{{baseUrl}}/games/{{gameId}}/sessions",
+        "protocolProfileBehavior": { "disableCookies": true }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('authentication required', () => pm.response.to.have.status(401));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm score submission is unavailable in M05",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const csrf = pm.cookies.get('playrush_csrf') || pm.cookies.get('__Host-playrush_csrf');",
+              "pm.variables.set('csrfToken', csrf || '');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('score route does not exist', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"score\": 100\n}" },
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}/scores"
+      }
+    }
+  ]
+}

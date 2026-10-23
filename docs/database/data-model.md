@@ -43,6 +43,8 @@ erDiagram
 
 `game_sessions` fixes the user, game version, server-issued seed/nonce hashes, lifecycle, start, and expiry. `game_session_events` stores ordered simulation input. `score_submissions` records non-authoritative claims, replay digests, and verification state. Only `verified_scores` stores authoritative metres, coins, computed score, server finish time, and disqualification state. Unique session/submission constraints reject duplicate accepted results.
 
+M05 consumes `game_sessions` without a schema change. Raw 256-bit seed and nonce values are returned only from the creation use case; SHA-256 hashes occupy `seed_hash` and `nonce_hash`. Creation fixes the selected active published version and server UTC window. The application locks the active user row to enforce one open session per user/game/mode despite MySQL/MariaDB lacking portable partial unique indexes. `issued`, `active`, and `submitted` are treated as open; only issued/active rows age to expired automatically.
+
 ## Progression and competition
 
 `xp_ledger` is append-only and globally idempotent. M04 locks the relevant `player_profiles` row, appends one ledger event, and updates the cached total/level in the same transaction. Policy version and resulting level are retained in ledger metadata for repeat-safe original-effect responses. Character unlocks, achievements, badges, and reward grants use separate uniqueness/idempotency keys and remain future milestone behavior.

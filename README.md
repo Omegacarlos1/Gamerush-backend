@@ -69,8 +69,12 @@ The integration suite defaults to `playrush_migrations_test`, `root`, and a blan
 - `GET /api/v1/players/me` — create/read the authenticated player's profile
 - `PATCH /api/v1/players/me` — update only approved display fields with `X-CSRF-Token`
 - `GET /api/v1/players/me/xp-history` — read private cursor-paginated XP history
+- `GET /api/v1/games` — list active games with published immutable rules
+- `GET /api/v1/games/:gameId` — read one public active game configuration
+- `POST /api/v1/games/:gameId/sessions` — create a CSRF-protected practice/ranked session
+- `GET /api/v1/game-sessions/:sessionId` — read only the authenticated player's session state
 - Any unknown route — standardized `404` JSON error
 
-Authentication cookies are host-only and `SameSite=Strict`; production requires Secure `__Host-` names. Refresh, cookie-backed logout, and profile PATCH require the readable CSRF cookie value in `X-CSRF-Token`. XP awards are internal-only, server-controlled, idempotent transactions; there is no client award endpoint. No email vendor is configured; tests inject a deterministic verification-delivery adapter.
+Authentication cookies are host-only and `SameSite=Strict`; production requires Secure `__Host-` names. Refresh, cookie-backed logout, profile PATCH, and game-session creation require the readable CSRF cookie value in `X-CSRF-Token`. Session creation is separately rate-limited by `GAME_SESSION_RATE_LIMIT_*`, fixes server UTC start/expiry and the current published version, returns seed/nonce material once, and persists only hashes. XP awards remain internal-only, and M05 has no score-submission endpoint. No email vendor is configured; tests inject a deterministic verification-delivery adapter.
 
-See [architecture](docs/architecture.md), [authentication security](docs/security/authentication.md), [profile/progression policy](docs/progression.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M04 examples](docs/postman/M04-examples.md).
+See [architecture](docs/architecture.md), [authentication security](docs/security/authentication.md), [profile/progression policy](docs/progression.md), [game/session browser contract](docs/game-sessions.md), [data model](docs/database/data-model.md), [migration operations](docs/database/migrations.md), [OpenAPI](docs/api/openapi.yaml), and [M05 examples](docs/postman/M05-examples.md).

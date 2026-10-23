@@ -13,6 +13,8 @@ import { UnconfiguredVerificationDelivery } from './modules/auth/infrastructure/
 import { PlayerService } from './modules/players/application/player.service.js';
 import { ProgressionPolicyService } from './modules/players/application/progression-policy.service.js';
 import { MySqlPlayerRepository } from './modules/players/infrastructure/mysql-player.repository.js';
+import { GameService } from './modules/games/application/game.service.js';
+import { MySqlGameRepository } from './modules/games/infrastructure/mysql-game.repository.js';
 import { createLogger } from './shared/logging/logger.js';
 
 async function startServer(): Promise<void> {
@@ -44,7 +46,15 @@ async function startServer(): Promise<void> {
     new MySqlPlayerRepository(pool),
     new ProgressionPolicyService(),
   );
-  const app = createApp({ config, logger, healthService, authService, playerService });
+  const gameService = new GameService(new MySqlGameRepository(pool), logger);
+  const app = createApp({
+    config,
+    logger,
+    healthService,
+    authService,
+    playerService,
+    gameService,
+  });
   const server = createServer(app);
 
   try {

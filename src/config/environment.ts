@@ -19,6 +19,8 @@ const environmentSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
     AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+    GAME_SESSION_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1_000).default(60_000),
+    GAME_SESSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
     AUTH_ACCESS_TOKEN_SECRET: z.string().min(32),
     AUTH_CSRF_SECRET: z.string().min(32),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3_600).default(900),
@@ -108,6 +110,12 @@ export interface AppConfig {
       readonly max: number;
     };
   };
+  readonly games: {
+    readonly sessionRateLimit: {
+      readonly windowMs: number;
+      readonly max: number;
+    };
+  };
   readonly database: {
     readonly host: string;
     readonly port: number;
@@ -165,6 +173,12 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): AppConfig {
       rateLimit: {
         windowMs: result.data.AUTH_RATE_LIMIT_WINDOW_MS,
         max: result.data.AUTH_RATE_LIMIT_MAX,
+      },
+    },
+    games: {
+      sessionRateLimit: {
+        windowMs: result.data.GAME_SESSION_RATE_LIMIT_WINDOW_MS,
+        max: result.data.GAME_SESSION_RATE_LIMIT_MAX,
       },
     },
     database: {

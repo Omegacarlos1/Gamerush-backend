@@ -12,6 +12,11 @@ import type { AuthService } from './modules/auth/application/auth.service.js';
 import { createAuthRouter } from './modules/auth/presentation/auth.routes.js';
 import type { PlayerService } from './modules/players/application/player.service.js';
 import { createPlayerRouter } from './modules/players/presentation/player.routes.js';
+import type { GameService } from './modules/games/application/game.service.js';
+import {
+  createGameRouter,
+  createGameSessionRouter,
+} from './modules/games/presentation/game.routes.js';
 import { CorsOriginError } from './shared/errors/app-error.js';
 import { createErrorHandler } from './shared/http/error-handler.js';
 import { notFoundHandler } from './shared/http/not-found.js';
@@ -23,6 +28,7 @@ export interface AppDependencies {
   readonly healthService: HealthService;
   readonly authService?: AuthService;
   readonly playerService?: PlayerService;
+  readonly gameService?: GameService;
 }
 
 export function createApp({
@@ -31,6 +37,7 @@ export function createApp({
   healthService,
   authService,
   playerService,
+  gameService,
 }: AppDependencies): Express {
   const app = express();
 
@@ -83,6 +90,12 @@ export function createApp({
   }
   if (authService !== undefined && playerService !== undefined) {
     app.use('/api/v1/players', createPlayerRouter(playerService, authService, config));
+  }
+  if (gameService !== undefined) {
+    app.use('/api/v1/games', createGameRouter(gameService, authService, config));
+  }
+  if (gameService !== undefined && authService !== undefined) {
+    app.use('/api/v1/game-sessions', createGameSessionRouter(gameService, authService, config));
   }
   app.use(notFoundHandler);
   app.use(createErrorHandler(logger));
