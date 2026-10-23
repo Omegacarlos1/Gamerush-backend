@@ -41,4 +41,8 @@ Players and administrators are authorized from the current database role. The JW
 
 No vendor is approved. The application invokes `VerificationDelivery`; tests inject a deterministic capturing adapter. The runtime adapter is intentionally unconfigured and does not print, return, or persist plaintext tokens outside the delivery call. Production release requires an approved provider or transactional outbox adapter, delivery/retry monitoring, and operational configuration without changing the application use case.
 
+## M06 score-submission boundary
+
+Ranked score submission uses the same live access-session and signed CSRF checks, plus its own rate limit, 64 KiB evidence bound, and required `Idempotency-Key`. Ownership is scoped in the locking query. Submission/retrieval responses and structured logs omit raw evidence, seed/nonce values, stored hashes, cookies, internal IDs, and detailed verifier diagnostics. Unknown and another player's session/submission share the same not-found behavior.
+
 References: [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [`node-argon2`](https://github.com/ranisalt/node-argon2), and [`jose`](https://github.com/panva/jose).

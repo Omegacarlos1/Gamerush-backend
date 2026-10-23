@@ -1,0 +1,177 @@
+{
+  "info": {
+    "_postman_id": "d9b892c4-cd60-4cf5-a8dc-492d0cf0e006",
+    "name": "PlayRush M06 - Score verification",
+    "description": "Runnable M06 accepted, rejected, idempotent, drift, and ownership examples. Sign in first so Postman holds the auth cookies. Copy the readable CSRF cookie into csrfToken and keep the one-time scoreSeed/scoreNonce values only in your local environment; this collection does not store them.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3000/api/v1" },
+    { "key": "sessionId", "value": "" },
+    { "key": "submissionId", "value": "" },
+    { "key": "otherSubmissionId", "value": "00000000-0000-4000-8000-000000000000" },
+    { "key": "gameVersionId", "value": "20000000-0000-4000-8000-000000000001" },
+    { "key": "simulationTicks", "value": "120" },
+    { "key": "terminalType", "value": "collision" },
+    { "key": "claimedMetres", "value": "30" },
+    { "key": "claimedCoins", "value": "0" },
+    { "key": "claimedScore", "value": "30" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "scoreSeed", "value": "" },
+    { "key": "scoreNonce", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Accepted deterministic score",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+          { "key": "Idempotency-Key", "value": "m06-postman-accepted" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contractVersion\": \"runner-evidence-v1\",\n  \"gameVersionId\": \"{{gameVersionId}}\",\n  \"rulesVersion\": \"runner-score-v1\",\n  \"seed\": \"{{scoreSeed}}\",\n  \"nonce\": \"{{scoreNonce}}\",\n  \"simulationTicks\": {{simulationTicks}},\n  \"terminal\": { \"type\": \"{{terminalType}}\", \"tick\": {{simulationTicks}} },\n  \"events\": [],\n  \"claimed\": { \"metres\": {{claimedMetres}}, \"coins\": {{claimedCoins}}, \"score\": {{claimedScore}} }\n}"
+        },
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}/scores",
+        "description": "The values must come from the matching deterministic browser replay. A placeholder request is not expected to pass verification."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('accepted or identical replay', () => pm.expect([200, 201]).to.include(pm.response.code));",
+              "const body = pm.response.json();",
+              "pm.expect(body.data.submission.status).to.eql('accepted');",
+              "pm.collectionVariables.set('submissionId', body.data.submission.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rejected fabricated claim",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+          { "key": "Idempotency-Key", "value": "m06-postman-rejected" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contractVersion\": \"runner-evidence-v1\",\n  \"gameVersionId\": \"{{gameVersionId}}\",\n  \"rulesVersion\": \"runner-score-v1\",\n  \"seed\": \"{{scoreSeed}}\",\n  \"nonce\": \"{{scoreNonce}}\",\n  \"simulationTicks\": {{simulationTicks}},\n  \"terminal\": { \"type\": \"{{terminalType}}\", \"tick\": {{simulationTicks}} },\n  \"events\": [],\n  \"claimed\": { \"metres\": {{claimedMetres}}, \"coins\": {{claimedCoins}}, \"score\": 999999 }\n}"
+        },
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}/scores"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('terminal rejection', () => pm.response.to.have.status(422));",
+              "pm.expect(pm.response.json().data.submission.rejectionCode).to.eql('CLAIM_MISMATCH');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Duplicate accepted submission",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+          { "key": "Idempotency-Key", "value": "m06-postman-accepted" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contractVersion\": \"runner-evidence-v1\",\n  \"gameVersionId\": \"{{gameVersionId}}\",\n  \"rulesVersion\": \"runner-score-v1\",\n  \"seed\": \"{{scoreSeed}}\",\n  \"nonce\": \"{{scoreNonce}}\",\n  \"simulationTicks\": {{simulationTicks}},\n  \"terminal\": { \"type\": \"{{terminalType}}\", \"tick\": {{simulationTicks}} },\n  \"events\": [],\n  \"claimed\": { \"metres\": {{claimedMetres}}, \"coins\": {{claimedCoins}}, \"score\": {{claimedScore}} }\n}"
+        },
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}/scores"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('original result replayed', () => pm.response.to.have.status(200));",
+              "pm.expect(pm.response.json().data.replayed).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Idempotency payload drift",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+          { "key": "Idempotency-Key", "value": "m06-postman-accepted" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contractVersion\": \"runner-evidence-v1\",\n  \"gameVersionId\": \"{{gameVersionId}}\",\n  \"rulesVersion\": \"runner-score-v1\",\n  \"seed\": \"{{scoreSeed}}\",\n  \"nonce\": \"{{scoreNonce}}\",\n  \"simulationTicks\": {{simulationTicks}},\n  \"terminal\": { \"type\": \"{{terminalType}}\", \"tick\": {{simulationTicks}} },\n  \"events\": [],\n  \"claimed\": { \"metres\": {{claimedMetres}}, \"coins\": {{claimedCoins}}, \"score\": 999998 }\n}"
+        },
+        "url": "{{baseUrl}}/game-sessions/{{sessionId}}/scores"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('payload drift conflicts', () => pm.response.to.have.status(409));",
+              "pm.expect(pm.response.json().error.code).to.eql('SCORE_IDEMPOTENCY_CONFLICT');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get owned score submission",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/score-submissions/{{submissionId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('owned result returned', () => pm.response.to.have.status(200));",
+              "const text = pm.response.text();",
+              "pm.expect(text).not.to.include('events');",
+              "pm.expect(text).not.to.include('seed');",
+              "pm.expect(text).not.to.include('nonce');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get unknown or another player's submission",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/score-submissions/{{otherSubmissionId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('ownership is hidden', () => pm.response.to.have.status(404));",
+              "pm.expect(pm.response.json().error.code).to.eql('SCORE_SUBMISSION_NOT_FOUND');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

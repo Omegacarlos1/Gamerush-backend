@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: PlayRush Backend API
-  version: 0.5.0
-  description: M05 foundation, identity/access, profiles/progression, public game catalog, and authenticated server-issued game sessions. Authentication tokens use cookies and are never returned in JSON. Score submission and XP award APIs do not exist in M05.
+  version: 0.6.0
+  description: M06 foundation, identity/access, profiles/progression, game sessions, and deterministic ranked-score verification. Authentication tokens use cookies and are never returned in JSON. Browser score claims and replay evidence are never authoritative.
 servers:
   - url: http://127.0.0.1:3000/api/v1
     description: Local XAMPP MariaDB development
@@ -481,6 +481,110 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /game-sessions/{sessionId}/scores:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: submitRankedScore
+      summary: Submit bounded deterministic evidence for one ranked session
+      description: Requires the one-time seed/nonce, immutable version identifiers, ordered input events, terminal tick, untrusted claims, and Idempotency-Key. Structurally valid verification failures are terminal and persisted with a stable safe rejection code. Server failures roll back and remain retryable.
+      security:
+        - accessCookie: []
+          refreshCookie: []
+          csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreEvidence'
+      responses:
+        '200':
+          description: Identical idempotent replay; returns the original accepted or rejected result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSubmissionAttemptResponse'
+        '201':
+          description: Evidence accepted and authoritative score/XP effects committed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSubmissionAttemptResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: CSRF validation failed or account access changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session is unknown or not owned by the current player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Practice, expiry, terminal state, or idempotency payload conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Evidence exceeds the dedicated 64 KiB bound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Structurally valid evidence was terminally rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSubmissionAttemptResponse'
+        '429':
+          $ref: '#/components/responses/ScoreSubmissionRateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /score-submissions/{submissionId}:
+    parameters:
+      - $ref: '#/components/parameters/SubmissionId'
+    get:
+      operationId: getScoreSubmission
+      summary: Get one owned safe score-submission result
+      description: Returns processing state and safe accepted/rejected fields. Evidence, claims, credential material, hashes, internal IDs, and verifier diagnostics are omitted. Unknown and other-player submissions share one not-found response.
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Owned safe submission state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSubmissionResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: Authentication is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Submission is unknown or not owned by the current player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     accessCookie:
@@ -517,6 +621,20 @@ components:
       schema:
         type: string
         format: uuid
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,190}$'
   schemas:
     RegisterRequest:
       type: object
@@ -889,6 +1007,175 @@ components:
           properties:
             session:
               $ref: '#/components/schemas/GameSession'
+    RunnerInputEvent:
+      type: object
+      additionalProperties: false
+      required: [sequence, tick, type, payload]
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 1024
+          description: Contiguous one-based sequence in array order.
+        tick:
+          type: integer
+          minimum: 1
+          maximum: 72000
+          description: Strictly greater than the preceding event tick and no later than the terminal tick.
+        type:
+          type: string
+          enum: [jump, moveLeft, moveRight]
+        payload:
+          type: object
+          additionalProperties: false
+          maxProperties: 0
+    ScoreEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          contractVersion,
+          gameVersionId,
+          rulesVersion,
+          seed,
+          nonce,
+          simulationTicks,
+          terminal,
+          events,
+          claimed,
+        ]
+      properties:
+        contractVersion:
+          const: runner-evidence-v1
+        gameVersionId:
+          type: string
+          format: uuid
+        rulesVersion:
+          type: string
+          maxLength: 32
+        seed:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          writeOnly: true
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          writeOnly: true
+        simulationTicks:
+          type: integer
+          minimum: 1
+          maximum: 72000
+        terminal:
+          type: object
+          additionalProperties: false
+          required: [type, tick]
+          properties:
+            type:
+              type: string
+              enum: [collision, timeout]
+            tick:
+              type: integer
+              minimum: 1
+              maximum: 72000
+              description: Must equal simulationTicks.
+        events:
+          type: array
+          maxItems: 1024
+          items:
+            $ref: '#/components/schemas/RunnerInputEvent'
+        claimed:
+          type: object
+          additionalProperties: false
+          description: Non-authoritative values that must exactly match replay output.
+          required: [metres, coins, score]
+          properties:
+            metres:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            coins:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            score:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+    VerifiedScoreResult:
+      type: object
+      additionalProperties: false
+      required: [metres, coins, score, finishedAt, xpAwarded]
+      properties:
+        metres:
+          type: integer
+          minimum: 0
+        coins:
+          type: integer
+          minimum: 0
+        score:
+          type: integer
+          minimum: 0
+        finishedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        xpAwarded:
+          type: integer
+          minimum: 0
+          readOnly: true
+    ScoreSubmission:
+      type: object
+      additionalProperties: false
+      required: [id, sessionId, status, rejectionCode, submittedAt, processedAt, result]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        rejectionCode:
+          type: [string, 'null']
+          enum: [CREDENTIAL_MISMATCH, VERSION_MISMATCH, REPLAY_INVALID, CLAIM_MISMATCH, null]
+        submittedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: [string, 'null']
+          format: date-time
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/VerifiedScoreResult'
+            - type: 'null'
+    ScoreSubmissionAttemptResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [submission, replayed]
+          properties:
+            submission:
+              $ref: '#/components/schemas/ScoreSubmission'
+            replayed:
+              type: boolean
+    ScoreSubmissionResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [submission]
+          properties:
+            submission:
+              $ref: '#/components/schemas/ScoreSubmission'
     HealthResponse:
       type: object
       additionalProperties: false
@@ -944,6 +1231,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     GameSessionRateLimited:
       description: Dedicated game-session issuance rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ScoreSubmissionRateLimited:
+      description: Dedicated score-submission rate limit exceeded
       content:
         application/json:
           schema:

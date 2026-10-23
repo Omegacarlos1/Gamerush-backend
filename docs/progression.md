@@ -51,3 +51,9 @@ The repository retries bounded deadlocks. A repeated key with the same player, a
 History is ordered by `(created_at DESC, id DESC)`. The opaque base64url cursor carries a version plus the last timestamp/database ID solely for stable continuation. Every query is still scoped by the authenticated user's public UUID, so editing a cursor cannot select another player's rows.
 
 The default page size is 20 and the accepted range is 1–100. Responses expose amount, balance after, source type, opaque source reference, and UTC creation time. Internal ledger IDs and metadata are omitted. Values outside JavaScript's safe integer range are treated as invalid stored state rather than serialized imprecisely.
+
+## M06 gameplay XP integration
+
+Only an accepted ranked deterministic replay can create a gameplay XP effect. M06 loads the active progression policy inside the same transaction as the authoritative score, calculates `floor(verified score / score_points_per_xp)`, and uses `gameplay:<session UUID>` as the global ledger idempotency key. The ledger source reference is the public verified-score UUID. Score, ledger, cached total/level, submission status, and session acceptance commit or roll back together.
+
+An accepted result below the policy ratio reports `xpAwarded: 0` and deliberately creates no ledger row or profile update because the append-only XP interface accepts positive effects only. Identical score retries return the original result and never invoke another progression effect. M06 does not evaluate character unlocks.

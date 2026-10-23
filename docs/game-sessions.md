@@ -27,7 +27,7 @@ The server selects the version and supplies the public session UUID, UTC `starte
 
 The browser must retain seed and nonce only for the current run. They are delivered once in the `201` response under `data.credentials`; `GET /api/v1/game-sessions/:sessionId` never returns them. Both session routes use `Cache-Control: no-store`. Persistence contains only SHA-256 hashes, and structured logging redacts raw and hash field names.
 
-Do not derive a score, XP award, completion time, owner, version, or status from browser claims. M05 has no submission endpoint. Its typed `SessionVerificationPort` and `ScoreVerificationPort` define the future M06 dependency boundary without making evidence authoritative.
+Do not derive a score, XP award, completion time, owner, version, or status from browser claims. M06 accepts only strict `runner-evidence-v1` at `POST /api/v1/game-sessions/:sessionId/scores`, binds it to this session's credentials/version, and replays it through the injected deterministic verifier. See `docs/score-verification.md`.
 
 ## Ownership, duplicates, and expiry
 
@@ -58,7 +58,7 @@ stateDiagram-v2
     Abandoned --> [*]
 ```
 
-M05 performs `issued -> active` inside the creation transaction, so browsers observe `active`. Automatic expiry uses server UTC. `submitted`, `accepted`, and `rejected` are reserved for the internal M06 verification workflow; no M05 HTTP request can select a state. Terminal states do not transition.
+M05 performs `issued -> active` inside the creation transaction, so browsers observe `active`. Automatic expiry uses server UTC. M06 performs `active -> submitted -> accepted|rejected` in one locked transaction. Structurally valid verification failures are terminal; malformed requests persist nothing. Infrastructure failures roll back to `active`, permitting an identical idempotent retry. Practice score submission is rejected without a lifecycle or reward effect. Terminal states do not transition.
 
 ## Phaser integration checklist
 
@@ -66,6 +66,7 @@ M05 performs `issued -> active` inside the creation transaction, so browsers obs
 2. Create a practice or ranked session immediately before starting simulation.
 3. Treat response `startedAt`/`expiresAt` as authoritative; never send browser wall-clock start or finish time.
 4. Initialize deterministic simulation from `credentials.seed`; keep seed and nonce out of logs, URLs, analytics, and durable browser storage.
-5. Stop accepting gameplay input when the server expiry has elapsed, allowing only network tolerance that a future M06 contract explicitly defines.
+5. Stop accepting gameplay input when the server expiry has elapsed. M06 requires receipt while the session is unexpired and derives finish time from deterministic ticks.
 6. If credentials are lost, do not request their retrieval; the browser must wait for expiry or use a future approved abandon operation.
-7. Do not show a ranked/XP result until the future verification response accepts it.
+7. Submit strict `runner-evidence-v1` once with `Idempotency-Key`; an identical retry returns the original result.
+8. Do not show a ranked/XP result until the verification response accepts it.

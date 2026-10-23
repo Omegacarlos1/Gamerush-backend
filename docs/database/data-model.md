@@ -45,6 +45,8 @@ erDiagram
 
 M05 consumes `game_sessions` without a schema change. Raw 256-bit seed and nonce values are returned only from the creation use case; SHA-256 hashes occupy `seed_hash` and `nonce_hash`. Creation fixes the selected active published version and server UTC window. The application locks the active user row to enforce one open session per user/game/mode despite MySQL/MariaDB lacking portable partial unique indexes. `issued`, `active`, and `submitted` are treated as open; only issued/active rows age to expired automatically.
 
+M06 consumes the remaining gameplay tables without a schema change. `score_submissions.replay_digest` is a canonical SHA-256 digest over normalized evidence plus hashed credential presentation, never plaintext credentials. Claims remain non-authoritative. Ordered events and terminal accepted/rejected decisions are retained for integrity review, while public reads omit that private material. Unique session/submission constraints plus a locked session row allow one `verified_scores` row and one `gameplay:<session UUID>` XP ledger effect. The verified score, progression effect, cached profile update, and lifecycle outcome share one transaction.
+
 ## Progression and competition
 
 `xp_ledger` is append-only and globally idempotent. M04 locks the relevant `player_profiles` row, appends one ledger event, and updates the cached total/level in the same transaction. Policy version and resulting level are retained in ledger metadata for repeat-safe original-effect responses. Character unlocks, achievements, badges, and reward grants use separate uniqueness/idempotency keys and remain future milestone behavior.

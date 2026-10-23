@@ -128,3 +128,10 @@ Before performing Git operations, inspect the current branch, working tree and r
 - Game-session creation requires live cookie authentication and signed session-bound CSRF, accepts only an allowlisted mode, and derives owner, version, state, start, and expiry on the server.
 - Deliver independently random seed/nonce material once, persist only approved hashes, mark session responses `no-store`, and keep raw and hashed material out of logs and retrieval responses.
 - Enforce one open session per player/game/mode transactionally, owner-scope retrieval, expire from server UTC, and permit only explicit lifecycle transitions. Browser scores/evidence remain non-authoritative until verified by a later trusted workflow.
+
+## Score verification conventions
+
+- Ranked evidence uses strict versioned bounded contracts and an injected deterministic verifier; browser claims, timestamps, versions, ownership, status, score and XP are never authoritative.
+- Score submission requires live cookie authentication, signed session-bound CSRF, a bounded idempotency key, an owned active unexpired ranked session and safe credential-hash comparison.
+- Session state, events, submission outcome, verified score, gameplay XP ledger and cached progression commit atomically under a session row lock. Server failures roll back to a retryable state; structurally valid anti-cheat rejections are terminal.
+- Practice sessions never create authoritative scores, XP, leaderboard/achievement input or rewards. Public result reads never expose replay evidence, credential material/hashes, internal IDs/metadata or exploitable verifier diagnostics.

@@ -49,6 +49,8 @@ M04 also requires no new migration. The immutable `0003_progression` definition 
 
 M05 requires no new migration. `0002_game_catalog` already links each active game to an immutable version with rules and a bounded duration; `0004_gameplay` already fixes session owner/version/mode, hash-only seed and nonce material, server timestamps, and lifecycle states. The portable duplicate policy is transactionally serialized with a user-row lock rather than a MySQL-specific partial index. Applied migrations `0001`–`0007` remain byte-for-byte unchanged.
 
+M06 also requires no new migration. `0004_gameplay` already separates ordered evidence/non-authoritative claims from the unique authoritative score, and `0003_progression` already supplies the globally idempotent append-only XP effect and cached profile fields. A session row lock serializes submission, while existing unique keys enforce idempotency, session digest, one verified score per session/submission, and one gameplay XP key. All seven applied migrations remain byte-for-byte unchanged.
+
 ## Seed contents
 
 Seeds are deterministic and repeat-safe. They contain two roles, one endless-runner game/version, three cosmetic characters, one progression policy, two achievement definitions, three weekly placement badges, and four top-10 virtual reward rules. They contain no usable accounts, passwords, sessions, or tokens.
