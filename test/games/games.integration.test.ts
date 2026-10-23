@@ -337,7 +337,7 @@ describe('M05 games and server-issued sessions on the isolated database', functi
   it('applies the dedicated game-session creation rate limit', async () => {
     const limitedConfig: AppConfig = {
       ...config,
-      games: { sessionRateLimit: { windowMs: 60_000, max: 1 } },
+      games: { ...config.games, sessionRateLimit: { windowMs: 60_000, max: 1 } },
     };
     const fixture = buildFixture(pool, limitedConfig, clock);
     await createActivePlayer(fixture, 'limited@m05.test', 'limited_m05');
